@@ -49,6 +49,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const [showHistory, setShowHistory] = useState(false)
   const historyRef = useRef<HTMLElement>(null)
+  const isBienBan = state.docType === 'bien-ban'
 
   useEffect(() => {
     if (showHistory && historyRef.current) {
@@ -103,31 +104,35 @@ export default function Sidebar({
 
         {/* 1. Thông tin cơ quan */}
         <section>
-          <SectionTitle>1. Thông tin cơ quan &amp; Tiêu đề</SectionTitle>
-          <Field label="Cơ quan chủ quản">
-            <input value={state.agencyUpper} onChange={set('agencyUpper')} className={inputCls} />
-          </Field>
-          <Field label="Cơ quan ban hành">
-            <select value={state.agencyMain} onChange={handleAgencyChange} className={inputCls}>
-              {agencies.map(a => (
-                <option key={a.main} value={a.main}>{a.main}</option>
-              ))}
-            </select>
-          </Field>
-          <div className="flex gap-2.5">
-            <Field label="Số" className="flex-1">
-              <input value={state.docNumber} onChange={set('docNumber')} className={inputCls} placeholder="12" />
-            </Field>
-            <Field label="Ký hiệu" className="flex-1">
-              <input value={state.docSymbol} onChange={set('docSymbol')} className={inputCls} placeholder="/BHXH-CL" />
-            </Field>
-          </div>
-          <Field label="Địa danh">
-            <input value={state.location} onChange={set('location')} className={inputCls} />
-          </Field>
-          <Field label="Ngày tháng năm">
-            <input type="date" value={state.date} onChange={set('date')} className={inputCls} />
-          </Field>
+          <SectionTitle>{isBienBan ? '1. Thông tin biên bản' : '1. Thông tin cơ quan & Tiêu đề'}</SectionTitle>
+          {!isBienBan && (
+            <>
+              <Field label="Cơ quan chủ quản">
+                <input value={state.agencyUpper} onChange={set('agencyUpper')} className={inputCls} />
+              </Field>
+              <Field label="Cơ quan ban hành">
+                <select value={state.agencyMain} onChange={handleAgencyChange} className={inputCls}>
+                  {agencies.map(a => (
+                    <option key={a.main} value={a.main}>{a.main}</option>
+                  ))}
+                </select>
+              </Field>
+              <div className="flex gap-2.5">
+                <Field label="Số" className="flex-1">
+                  <input value={state.docNumber} onChange={set('docNumber')} className={inputCls} placeholder="12" />
+                </Field>
+                <Field label="Ký hiệu" className="flex-1">
+                  <input value={state.docSymbol} onChange={set('docSymbol')} className={inputCls} placeholder="/BHXH-CL" />
+                </Field>
+              </div>
+              <Field label="Địa danh">
+                <input value={state.location} onChange={set('location')} className={inputCls} />
+              </Field>
+              <Field label="Ngày tháng năm">
+                <input type="date" value={state.date} onChange={set('date')} className={inputCls} />
+              </Field>
+            </>
+          )}
         </section>
 
         {/* 2. Thể loại */}
@@ -172,6 +177,9 @@ export default function Sidebar({
             /* --- Biên bản: Đại diện bên A và bên B --- */
             <>
               <div className="mb-2 text-[0.78rem] font-bold text-[#1a56b0] uppercase tracking-wide">Đại diện bên A</div>
+              <Field label="Tên cơ quan/đơn vị bên A">
+                <input value={state.partyAUnit} onChange={set('partyAUnit')} className={inputCls} placeholder="Nhập tên cơ quan/đơn vị..." />
+              </Field>
               <Field label="Chức vụ bên A">
                 <input value={state.partyAPosition} onChange={set('partyAPosition')} className={inputCls} placeholder="Ví dụ: Giám đốc" />
               </Field>
@@ -180,6 +188,9 @@ export default function Sidebar({
               </Field>
 
               <div className="mb-2 mt-4 text-[0.78rem] font-bold text-[#1a56b0] uppercase tracking-wide">Đại diện bên B</div>
+              <Field label="Tên cơ quan/đơn vị bên B">
+                <input value={state.partyBUnit} onChange={set('partyBUnit')} className={inputCls} placeholder="Nhập tên cơ quan/đơn vị..." />
+              </Field>
               <Field label="Chức vụ bên B">
                 <input value={state.partyBPosition} onChange={set('partyBPosition')} className={inputCls} placeholder="Ví dụ: Giám đốc" />
               </Field>

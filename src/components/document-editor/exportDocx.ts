@@ -111,10 +111,6 @@ export async function exportDocx(state: DocumentState) {
             spacing: { before: 0, after: 0, line: 160, lineRule: LineRuleType.EXACTLY },
             children: [new TextRun({ text: '______________________________________', font: 'Times New Roman', bold: true, size: 16 })],
           }),
-          emptyLine(),
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [
-            new TextRun({ text: formattedDate, font: 'Times New Roman', italics: true, size: 28 }),
-          ]}),
         ] : [
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
@@ -235,6 +231,9 @@ export async function exportDocx(state: DocumentState) {
                   new TextRun({ text: 'ĐẠI DIỆN BÊN A', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
                 ]}),
                 new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new TextRun({ text: state.partyAUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                ]}),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [
                   new TextRun({ text: state.partyAPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
                 ]}),
                 emptyLine(),
@@ -261,6 +260,9 @@ export async function exportDocx(state: DocumentState) {
               children: isBienBan ? [
                 new Paragraph({ alignment: AlignmentType.CENTER, children: [
                   new TextRun({ text: 'ĐẠI DIỆN BÊN B', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
+                ]}),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new TextRun({ text: state.partyBUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
                 ]}),
                 new Paragraph({ alignment: AlignmentType.CENTER, children: [
                   new TextRun({ text: state.partyBPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),

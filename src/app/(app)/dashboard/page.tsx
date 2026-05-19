@@ -9,6 +9,7 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   'bao-cao': 'Báo cáo',
   'thong-bao': 'Thông báo',
   'ke-hoach': 'Kế hoạch',
+  'bien-ban': 'Biên bản',
 }
 
 const DOC_TYPE_COLORS: Record<string, string> = {
@@ -16,6 +17,7 @@ const DOC_TYPE_COLORS: Record<string, string> = {
   'bao-cao': 'bg-purple-100 text-purple-700',
   'thong-bao': 'bg-amber-100 text-amber-700',
   'ke-hoach': 'bg-green-100 text-green-700',
+  'bien-ban': 'bg-rose-100 text-rose-700',
 }
 
 export default async function DashboardPage() {

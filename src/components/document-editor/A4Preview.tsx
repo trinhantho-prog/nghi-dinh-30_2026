@@ -102,9 +102,6 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           <div style={{ fontSize: '13pt', fontWeight: 'bold', display: 'inline-block', borderBottom: '1px solid black' }}>
             Độc lập - Tự do - Hạnh phúc
           </div>
-          <div style={{ fontSize: '13pt', fontStyle: 'italic', marginTop: '4pt' }}>
-            {formattedDate}
-          </div>
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.8rem' }}>
@@ -212,6 +209,9 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           {isBienBan ? (
             <>
               <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+                {state.partyAUnit}
+              </div>
+              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
                 {state.partyAPosition}
               </div>
               <div style={{ height: '90px' }} />
@@ -231,6 +231,9 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
             <>
               <div style={{ fontSize: '12pt', fontWeight: 'bold', fontStyle: 'italic', textDecoration: 'underline', marginBottom: '4pt' }}>
                 ĐẠI DIỆN BÊN B
+              </div>
+              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+                {state.partyBUnit}
               </div>
               <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
                 {state.partyBPosition}
