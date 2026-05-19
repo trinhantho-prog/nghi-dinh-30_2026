@@ -17,6 +17,10 @@ export interface DocumentState {
   signPosition: string
   signName: string
   recipientsCc: string
+  partyAPosition: string
+  partyAName: string
+  partyBPosition: string
+  partyBName: string
 }
 
 export const DEFAULT_DOCUMENT_STATE: DocumentState = {
@@ -36,6 +40,10 @@ export const DEFAULT_DOCUMENT_STATE: DocumentState = {
   signPosition: 'GIÁM ĐỐC',
   signName: '',
   recipientsCc: '- Như trên;\n- Lưu: VT.',
+  partyAPosition: '',
+  partyAName: '',
+  partyBPosition: '',
+  partyBName: '',
 }
 
 export interface Tenant {

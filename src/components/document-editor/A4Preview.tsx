@@ -209,9 +209,20 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           <div style={{ fontSize: '12pt', fontWeight: 'bold', fontStyle: 'italic', textDecoration: 'underline', marginBottom: '4pt' }}>
             {isBienBan ? 'ĐẠI DIỆN BÊN A' : 'Nơi nhận:'}
           </div>
-          {recipientsCcLines.map((line, i) => (
-            <div key={i} style={{ fontSize: '11pt' }}>{line}</div>
-          ))}
+          {isBienBan ? (
+            <>
+              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+                {state.partyAPosition}
+              </div>
+              <div style={{ height: '90px' }} />
+              <div style={{ fontWeight: 'bold' }}>{state.partyAName}</div>
+            </>
+          ) : (
+            recipientsCcLines.map((line, i) => (
+              <div key={i} style={{ fontSize: '11pt' }}>{line}</div>
+            ))
+          )}
+
         </div>
 
         {/* Cột phải: Chữ ký / Đại diện bên B */}
@@ -221,7 +232,11 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
               <div style={{ fontSize: '12pt', fontWeight: 'bold', fontStyle: 'italic', textDecoration: 'underline', marginBottom: '4pt' }}>
                 ĐẠI DIỆN BÊN B
               </div>
-              <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{state.signPosition}</div>
+              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+                {state.partyBPosition}
+              </div>
+              <div style={{ height: '90px' }} />
+              <div style={{ fontWeight: 'bold' }}>{state.partyBName}</div>
             </>
           ) : (
             <>
@@ -229,10 +244,10 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
                 <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>KT. GIÁM ĐỐC</div>
               )}
               <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{state.signPosition}</div>
+              <div style={{ height: '90px' }} />
+              <div style={{ fontWeight: 'bold' }}>{state.signName}</div>
             </>
           )}
-          <div style={{ height: '90px' }} />
-          <div style={{ fontWeight: 'bold' }}>{state.signName}</div>
         </div>
       </div>
     </div>

@@ -230,12 +230,25 @@ export async function exportDocx(state: DocumentState) {
             new TableCell({
               width: { size: 50, type: WidthType.PERCENTAGE },
               borders: noBorder,
-              children: [
+              children: isBienBan ? [
                 new Paragraph({ children: [
-                  new TextRun({
-                    text: isBienBan ? 'ĐẠI DIỆN BÊN A' : 'Nơi nhận:',
-                    font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24,
-                  }),
+                  new TextRun({ text: 'ĐẠI DIỆN BÊN A', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
+                ]}),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new TextRun({ text: state.partyAPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                ]}),
+                emptyLine(),
+                emptyLine(),
+                emptyLine(),
+                emptyLine(),
+                emptyLine(),
+                emptyLine(),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new TextRun({ text: state.partyAName, font: 'Times New Roman', bold: true, size: 28 }),
+                ]}),
+              ] : [
+                new Paragraph({ children: [
+                  new TextRun({ text: 'Nơi nhận:', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
                 ]}),
                 ...recipientsCcLines.map(line => new Paragraph({
                   children: [new TextRun({ text: line, font: 'Times New Roman', size: 22 })],
@@ -245,16 +258,26 @@ export async function exportDocx(state: DocumentState) {
             new TableCell({
               width: { size: 50, type: WidthType.PERCENTAGE },
               borders: noBorder,
-              children: [
-                ...(isBienBan ? [
-                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                    new TextRun({ text: 'ĐẠI DIỆN BÊN B', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
-                  ]}),
-                ] : isDeputy ? [
-                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                    new TextRun({ text: 'KT. GIÁM ĐỐC', font: 'Times New Roman', bold: true, size: 28 }),
-                  ]}),
-                ] : []),
+              children: isBienBan ? [
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new TextRun({ text: 'ĐẠI DIỆN BÊN B', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
+                ]}),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new TextRun({ text: state.partyBPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                ]}),
+                emptyLine(),
+                emptyLine(),
+                emptyLine(),
+                emptyLine(),
+                emptyLine(),
+                emptyLine(),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new TextRun({ text: state.partyBName, font: 'Times New Roman', bold: true, size: 28 }),
+                ]}),
+              ] : [
+                ...(isDeputy ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new TextRun({ text: 'KT. GIÁM ĐỐC', font: 'Times New Roman', bold: true, size: 28 }),
+                ]})] : []),
                 new Paragraph({ alignment: AlignmentType.CENTER, children: [
                   new TextRun({ text: state.signPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
                 ]}),

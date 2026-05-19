@@ -167,26 +167,51 @@ export default function Sidebar({
           <Field label="Kết luận / Yêu cầu">
             <textarea value={state.conclusion} onChange={set('conclusion')} rows={2} className={`${inputCls} resize-y`} />
           </Field>
-          <div className="flex gap-2.5">
-            <Field label={state.docType === 'bien-ban' ? 'Đại diện bên B' : 'Chức vụ người ký'} className="flex-1">
-              <select value={state.signPosition} onChange={set('signPosition')} className={inputCls}>
-                {[...new Set(signers.map(s => s.position))].map(p => (
-                  <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Họ và tên" className="flex-1">
-              <select value={state.signName} onChange={set('signName')} className={inputCls}>
-                <option value="">-- Chọn --</option>
-                {filteredSigners.map(s => (
-                  <option key={s.name} value={s.name}>{s.name}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
-          <Field label={state.docType === 'bien-ban' ? 'Đại diện bên A' : 'Nơi nhận (phần cuối)'}>
-            <textarea value={state.recipientsCc} onChange={set('recipientsCc')} rows={3} className={`${inputCls} resize-y`} />
-          </Field>
+
+          {state.docType === 'bien-ban' ? (
+            /* --- Biên bản: Đại diện bên A và bên B --- */
+            <>
+              <div className="mb-2 text-[0.78rem] font-bold text-[#1a56b0] uppercase tracking-wide">Đại diện bên A</div>
+              <Field label="Chức vụ bên A">
+                <input value={state.partyAPosition} onChange={set('partyAPosition')} className={inputCls} placeholder="Ví dụ: Giám đốc" />
+              </Field>
+              <Field label="Họ và tên bên A">
+                <input value={state.partyAName} onChange={set('partyAName')} className={inputCls} placeholder="Nhập họ và tên..." />
+              </Field>
+
+              <div className="mb-2 mt-4 text-[0.78rem] font-bold text-[#1a56b0] uppercase tracking-wide">Đại diện bên B</div>
+              <Field label="Chức vụ bên B">
+                <input value={state.partyBPosition} onChange={set('partyBPosition')} className={inputCls} placeholder="Ví dụ: Giám đốc" />
+              </Field>
+              <Field label="Họ và tên bên B">
+                <input value={state.partyBName} onChange={set('partyBName')} className={inputCls} placeholder="Nhập họ và tên..." />
+              </Field>
+            </>
+          ) : (
+            /* --- Các loại khác: Chữ ký thông thường --- */
+            <>
+              <div className="flex gap-2.5">
+                <Field label="Chức vụ người ký" className="flex-1">
+                  <select value={state.signPosition} onChange={set('signPosition')} className={inputCls}>
+                    {[...new Set(signers.map(s => s.position))].map(p => (
+                      <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Họ và tên" className="flex-1">
+                  <select value={state.signName} onChange={set('signName')} className={inputCls}>
+                    <option value="">-- Chọn --</option>
+                    {filteredSigners.map(s => (
+                      <option key={s.name} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <Field label="Nơi nhận (phần cuối)">
+                <textarea value={state.recipientsCc} onChange={set('recipientsCc')} rows={3} className={`${inputCls} resize-y`} />
+              </Field>
+            </>
+          )}
         </section>
 
         {/* 6. AI Kiểm tra */}
