@@ -6,6 +6,7 @@ const DOC_TYPE_TITLES: Record<string, string> = {
   'bao-cao': 'BÁO CÁO',
   'thong-bao': 'THÔNG BÁO',
   'ke-hoach': 'KẾ HOẠCH',
+  'bien-ban': 'BIÊN BẢN',
 }
 
 const addPunctuation = (line: string, isLast: boolean): string => {
@@ -41,6 +42,7 @@ function renderHighlighted(text: string, words: string[], onDoubleClick?: (word:
 
 export default function A4Preview({ state, highlightWords = [], onWordDoubleClick }: A4PreviewProps) {
   const isCongVan = state.docType === 'cong-van'
+  const isBienBan = state.docType === 'bien-ban'
   const docTypeTitle = DOC_TYPE_TITLES[state.docType]
   const isDeputy = /phó/i.test(state.signPosition)
 
@@ -91,28 +93,9 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
       }}
     >
       {/* Document Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.8rem' }}>
-        {/* Cột trái 48%: Cơ quan */}
-        <div style={{ width: '48%', textAlign: 'center' }}>
-          <div style={{ fontSize: '12pt', textTransform: 'uppercase' }}>{state.agencyUpper}</div>
-          <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>
-            {state.agencyMain}
-          </div>
-          <div style={{ width: '45%', height: '1px', background: 'black', margin: '3px auto 5px' }} />
-          <div style={{ fontSize: '13pt' }}>
-            Số: {state.docSymbol
-              ? `${state.docNumber || '   '}/${state.docSymbol}`
-              : (state.docNumber || '...')}
-          </div>
-          {isCongVan && (
-            <div style={{ fontSize: '13pt', textAlign: 'center', marginTop: '4pt' }}>
-              V/v {state.docSummary || '...'}
-            </div>
-          )}
-        </div>
-
-        {/* Cột phải 48%: Quốc hiệu */}
-        <div style={{ width: '48%', textAlign: 'center' }}>
+      {isBienBan ? (
+        /* Biên bản: Quốc ngữ + Độc lập canh giữa toàn trang, không cơ quan ban hành */
+        <div style={{ textAlign: 'center', marginBottom: '1.8rem' }}>
           <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
             CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
           </div>
@@ -123,7 +106,41 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
             {formattedDate}
           </div>
         </div>
-      </div>
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.8rem' }}>
+          {/* Cột trái 48%: Cơ quan */}
+          <div style={{ width: '48%', textAlign: 'center' }}>
+            <div style={{ fontSize: '12pt', textTransform: 'uppercase' }}>{state.agencyUpper}</div>
+            <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>
+              {state.agencyMain}
+            </div>
+            <div style={{ width: '45%', height: '1px', background: 'black', margin: '3px auto 5px' }} />
+            <div style={{ fontSize: '13pt' }}>
+              Số: {state.docSymbol
+                ? `${state.docNumber || '   '}/${state.docSymbol}`
+                : (state.docNumber || '...')}
+            </div>
+            {isCongVan && (
+              <div style={{ fontSize: '13pt', textAlign: 'center', marginTop: '4pt' }}>
+                V/v {state.docSummary || '...'}
+              </div>
+            )}
+          </div>
+
+          {/* Cột phải 48%: Quốc hiệu */}
+          <div style={{ width: '48%', textAlign: 'center' }}>
+            <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+              CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+            </div>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', display: 'inline-block', borderBottom: '1px solid black' }}>
+              Độc lập - Tự do - Hạnh phúc
+            </div>
+            <div style={{ fontSize: '13pt', fontStyle: 'italic', marginTop: '4pt' }}>
+              {formattedDate}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Kính gửi / Tên loại văn bản */}
       <div style={{ marginBottom: '0.9rem' }}>
@@ -185,24 +202,35 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
         )}
       </div>
 
-      {/* Footer: Nơi nhận + Chữ ký */}
+      {/* Footer: Nơi nhận / Đại diện bên A + Chữ ký / Đại diện bên B */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-        {/* Nơi nhận: 12pt, đậm, nghiêng, gạch chân */}
+        {/* Cột trái */}
         <div style={{ width: '42%' }}>
           <div style={{ fontSize: '12pt', fontWeight: 'bold', fontStyle: 'italic', textDecoration: 'underline', marginBottom: '4pt' }}>
-            Nơi nhận:
+            {isBienBan ? 'ĐẠI DIỆN BÊN A' : 'Nơi nhận:'}
           </div>
           {recipientsCcLines.map((line, i) => (
             <div key={i} style={{ fontSize: '11pt' }}>{line}</div>
           ))}
         </div>
 
-        {/* Chữ ký */}
+        {/* Cột phải: Chữ ký / Đại diện bên B */}
         <div style={{ width: '50%', textAlign: 'center' }}>
-          {isDeputy && (
-            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>KT. GIÁM ĐỐC</div>
+          {isBienBan ? (
+            <>
+              <div style={{ fontSize: '12pt', fontWeight: 'bold', fontStyle: 'italic', textDecoration: 'underline', marginBottom: '4pt' }}>
+                ĐẠI DIỆN BÊN B
+              </div>
+              <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{state.signPosition}</div>
+            </>
+          ) : (
+            <>
+              {isDeputy && (
+                <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>KT. GIÁM ĐỐC</div>
+              )}
+              <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{state.signPosition}</div>
+            </>
           )}
-          <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{state.signPosition}</div>
           <div style={{ height: '90px' }} />
           <div style={{ fontWeight: 'bold' }}>{state.signName}</div>
         </div>

@@ -10,6 +10,7 @@ const DOC_TYPE_TITLES: Record<string, string> = {
   'bao-cao': 'BÁO CÁO',
   'thong-bao': 'THÔNG BÁO',
   'ke-hoach': 'KẾ HOẠCH',
+  'bien-ban': 'BIÊN BẢN',
 }
 
 const addPunctuation = (line: string, isLast: boolean): string => {
@@ -46,6 +47,7 @@ function isHeadingLine(line: string): boolean {
 
 export async function exportDocx(state: DocumentState) {
   const isCongVan = state.docType === 'cong-van'
+  const isBienBan = state.docType === 'bien-ban'
   const isDeputy = /phó/i.test(state.signPosition)
 
   const formattedDate = state.date
@@ -96,61 +98,79 @@ export async function exportDocx(state: DocumentState) {
         }),
       },
       children: [
-        // Header: Cơ quan (48%) | Quốc hiệu (52%)
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          borders: noBorder,
-          rows: [new TableRow({ children: [
-            new TableCell({
-              width: { size: 48, type: WidthType.PERCENTAGE },
-              borders: noBorder,
-              children: [
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: state.agencyUpper, font: 'Times New Roman', size: 24, allCaps: true }),
-                ]}),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: state.agencyMain, font: 'Times New Roman', bold: true, size: 24, allCaps: true, characterSpacing: -20 }),
-                ]}),
-                new Paragraph({
-                  indent: { left: 827, right: 827 },
-                  border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
-                  children: [new TextRun({ text: '', font: 'Times New Roman' })],
-                }),
-                emptyLine(),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({
-                    text: `Số: ${state.docSymbol ? `${state.docNumber || '   '}/${state.docSymbol}` : (state.docNumber || '...')}`,
-                    font: 'Times New Roman', size: 26,
+        // Header: Biên bản → Quốc ngữ canh giữa toàn trang; các loại khác → Cơ quan | Quốc hiệu 2 cột
+        ...(isBienBan ? [
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [
+            new TextRun({ text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', font: 'Times New Roman', bold: true, size: 24, allCaps: true, characterSpacing: -20 }),
+          ]}),
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [
+            new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', font: 'Times New Roman', bold: true, size: 26 }),
+          ]}),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 0, after: 0, line: 160, lineRule: LineRuleType.EXACTLY },
+            children: [new TextRun({ text: '______________________________________', font: 'Times New Roman', bold: true, size: 16 })],
+          }),
+          emptyLine(),
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [
+            new TextRun({ text: formattedDate, font: 'Times New Roman', italics: true, size: 28 }),
+          ]}),
+        ] : [
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: noBorder,
+            rows: [new TableRow({ children: [
+              new TableCell({
+                width: { size: 48, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                children: [
+                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: state.agencyUpper, font: 'Times New Roman', size: 24, allCaps: true }),
+                  ]}),
+                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: state.agencyMain, font: 'Times New Roman', bold: true, size: 24, allCaps: true, characterSpacing: -20 }),
+                  ]}),
+                  new Paragraph({
+                    indent: { left: 827, right: 827 },
+                    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
+                    children: [new TextRun({ text: '', font: 'Times New Roman' })],
                   }),
-                ]}),
-                ...(isCongVan ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: `V/v ${state.docSummary}`, font: 'Times New Roman', size: 26 }),
-                ]})] : []),
-              ],
-            }),
-            new TableCell({
-              width: { size: 52, type: WidthType.PERCENTAGE },
-              borders: noBorder,
-              children: [
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', font: 'Times New Roman', bold: true, size: 24, allCaps: true, characterSpacing: -20 }),
-                ]}),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', font: 'Times New Roman', bold: true, size: 26 }),
-                ]}),
-                new Paragraph({
-                  alignment: AlignmentType.CENTER,
-                  spacing: { before: 0, after: 0, line: 160, lineRule: LineRuleType.EXACTLY },
-                  children: [new TextRun({ text: '______________________________________', font: 'Times New Roman', bold: true, size: 16 })],
-                }),
-                emptyLine(),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: formattedDate, font: 'Times New Roman', italics: true, size: 28 }),
-                ]}),
-              ],
-            }),
-          ]})],
-        }),
+                  emptyLine(),
+                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({
+                      text: `Số: ${state.docSymbol ? `${state.docNumber || '   '}/${state.docSymbol}` : (state.docNumber || '...')}`,
+                      font: 'Times New Roman', size: 26,
+                    }),
+                  ]}),
+                  ...(isCongVan ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: `V/v ${state.docSummary}`, font: 'Times New Roman', size: 26 }),
+                  ]})] : []),
+                ],
+              }),
+              new TableCell({
+                width: { size: 52, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                children: [
+                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', font: 'Times New Roman', bold: true, size: 24, allCaps: true, characterSpacing: -20 }),
+                  ]}),
+                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', font: 'Times New Roman', bold: true, size: 26 }),
+                  ]}),
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    spacing: { before: 0, after: 0, line: 160, lineRule: LineRuleType.EXACTLY },
+                    children: [new TextRun({ text: '______________________________________', font: 'Times New Roman', bold: true, size: 16 })],
+                  }),
+                  emptyLine(),
+                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: formattedDate, font: 'Times New Roman', italics: true, size: 28 }),
+                  ]}),
+                ],
+              }),
+            ]})],
+          }),
+        ]),
 
         emptyLine(),
 
@@ -202,7 +222,7 @@ export async function exportDocx(state: DocumentState) {
 
         emptyLine(),
 
-        // Footer: Nơi nhận + Chữ ký
+        // Footer: Nơi nhận/Đại diện bên A + Chữ ký/Đại diện bên B
         new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
           borders: noBorder,
@@ -212,7 +232,10 @@ export async function exportDocx(state: DocumentState) {
               borders: noBorder,
               children: [
                 new Paragraph({ children: [
-                  new TextRun({ text: 'Nơi nhận:', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
+                  new TextRun({
+                    text: isBienBan ? 'ĐẠI DIỆN BÊN A' : 'Nơi nhận:',
+                    font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24,
+                  }),
                 ]}),
                 ...recipientsCcLines.map(line => new Paragraph({
                   children: [new TextRun({ text: line, font: 'Times New Roman', size: 22 })],
@@ -223,9 +246,15 @@ export async function exportDocx(state: DocumentState) {
               width: { size: 50, type: WidthType.PERCENTAGE },
               borders: noBorder,
               children: [
-                ...(isDeputy ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: 'KT. GIÁM ĐỐC', font: 'Times New Roman', bold: true, size: 28 }),
-                ]})] : []),
+                ...(isBienBan ? [
+                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: 'ĐẠI DIỆN BÊN B', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
+                  ]}),
+                ] : isDeputy ? [
+                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: 'KT. GIÁM ĐỐC', font: 'Times New Roman', bold: true, size: 28 }),
+                  ]}),
+                ] : []),
                 new Paragraph({ alignment: AlignmentType.CENTER, children: [
                   new TextRun({ text: state.signPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
                 ]}),

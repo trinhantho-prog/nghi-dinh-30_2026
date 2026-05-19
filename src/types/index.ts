@@ -1,4 +1,4 @@
-export type DocType = 'cong-van' | 'bao-cao' | 'thong-bao' | 'ke-hoach'
+export type DocType = 'cong-van' | 'bao-cao' | 'thong-bao' | 'ke-hoach' | 'bien-ban'
 
 export interface DocumentState {
   docType: DocType

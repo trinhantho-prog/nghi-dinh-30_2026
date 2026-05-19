@@ -38,6 +38,7 @@ const DOC_TYPE_OPTIONS: { value: DocType; label: string }[] = [
   { value: 'bao-cao', label: 'Báo cáo' },
   { value: 'thong-bao', label: 'Thông báo' },
   { value: 'ke-hoach', label: 'Kế hoạch' },
+  { value: 'bien-ban', label: 'Biên bản' },
 ]
 
 export default function Sidebar({
@@ -167,7 +168,7 @@ export default function Sidebar({
             <textarea value={state.conclusion} onChange={set('conclusion')} rows={2} className={`${inputCls} resize-y`} />
           </Field>
           <div className="flex gap-2.5">
-            <Field label="Chức vụ người ký" className="flex-1">
+            <Field label={state.docType === 'bien-ban' ? 'Đại diện bên B' : 'Chức vụ người ký'} className="flex-1">
               <select value={state.signPosition} onChange={set('signPosition')} className={inputCls}>
                 {[...new Set(signers.map(s => s.position))].map(p => (
                   <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>
@@ -183,7 +184,7 @@ export default function Sidebar({
               </select>
             </Field>
           </div>
-          <Field label="Nơi nhận (phần cuối)">
+          <Field label={state.docType === 'bien-ban' ? 'Đại diện bên A' : 'Nơi nhận (phần cuối)'}>
             <textarea value={state.recipientsCc} onChange={set('recipientsCc')} rows={3} className={`${inputCls} resize-y`} />
           </Field>
         </section>

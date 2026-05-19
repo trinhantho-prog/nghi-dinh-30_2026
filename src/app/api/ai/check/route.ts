@@ -59,8 +59,8 @@ Từ bình dân, khẩu ngữ, địa phương hoặc nhầm lẫn từ gần â
 ## YÊU CẦU ĐỊNH DẠNG JSON (bắt buộc):
 - "field": tên trường chứa lỗi (một trong: Trích yếu / Kính gửi / Gửi đến / Căn cứ pháp lý / Đặt vấn đề / Nội dung chính / Kết luận)
 - "type": "error" cho nhóm 1 và nhóm 2
-- "description": cụm từ SAI trích nguyên văn từ văn bản, NGẮN tối đa 5 từ — KHÔNG trả về cả câu/đoạn văn
-- "suggestion": cụm từ ĐÚNG thay thế, ngắn gọn, ví dụ: "xử lý"
+- "description": cụm từ SAI gồm 2-4 từ trích nguyên văn, PHẢI bao gồm từ bị sai và 1-2 từ liền kề để định vị chính xác trong văn bản — VÍ DỤ: "kết quả làm việt" thay vì chỉ "việt"; "tiến hành sử lý" thay vì chỉ "sử lý"
+- "suggestion": cụm từ ĐÚNG tương ứng, cùng số từ với description — VÍ DỤ: "kết quả làm việc"; "tiến hành xử lý"
 - Nếu không xác định được từ cụ thể bị sai → KHÔNG báo lỗi đó
 
 ## Nội dung cần kiểm tra:
@@ -68,7 +68,7 @@ Từ bình dân, khẩu ngữ, địa phương hoặc nhầm lẫn từ gần â
 ${fields}
 
 Trả về JSON thuần túy (không có markdown, không có \`\`\`):
-{"issues": [{"field": "tên trường", "type": "error|warning", "description": "từ/cụm từ ngắn bị sai", "suggestion": "cách viết đúng"}]}
+{"issues": [{"field": "tên trường", "type": "error|warning", "description": "2-4 từ nguyên văn chứa lỗi", "suggestion": "cụm từ đúng tương ứng"}]}
 
 Nếu không phát hiện lỗi: {"issues": []}
 CHỈ trả về JSON, không kèm giải thích hay văn bản khác.`
