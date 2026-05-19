@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { DocumentState, Agency, Signer, AIIssue } from '@/types'
+import { DocumentState, Agency, Signer, AIIssue, MainContentBlock } from '@/types'
 import { useDocumentReducer } from './useDocumentReducer'
 import Sidebar from './Sidebar'
 import A4Preview from './A4Preview'
 import { exportDocx } from './exportDocx'
 import { saveDocument, saveVersion, deleteVersion } from '@/lib/actions/documents'
+import { parseTabularText, getEffectiveMainContentBlocks, plainTextToMainContentBlocks } from './mainContentBlocks'
 
 interface DocVersion {
   id: string

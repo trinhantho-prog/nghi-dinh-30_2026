@@ -1,5 +1,17 @@
 export type DocType = 'cong-van' | 'bao-cao' | 'thong-bao' | 'ke-hoach' | 'bien-ban'
 
+export type MainContentParagraphBlock = {
+  type: 'paragraph'
+  text: string
+}
+
+export type MainContentTableBlock = {
+  type: 'table'
+  rows: string[][]
+}
+
+export type MainContentBlock = MainContentParagraphBlock | MainContentTableBlock
+
 export interface DocumentState {
   docType: DocType
   agencyUpper: string
@@ -13,6 +25,7 @@ export interface DocumentState {
   legalBasis: string
   issueStatement: string
   mainContent: string
+  mainContentBlocks?: MainContentBlock[]
   conclusion: string
   signPosition: string
   signName: string

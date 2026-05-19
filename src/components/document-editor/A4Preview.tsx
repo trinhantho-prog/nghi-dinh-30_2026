@@ -1,6 +1,7 @@
 'use client'
 
 import { DocumentState } from '@/types'
+import { getEffectiveMainContentBlocks } from './mainContentBlocks'
 
 const DOC_TYPE_TITLES: Record<string, string> = {
   'bao-cao': 'BÁO CÁO',
@@ -45,6 +46,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
   const isBienBan = state.docType === 'bien-ban'
   const docTypeTitle = DOC_TYPE_TITLES[state.docType]
   const isDeputy = /phó/i.test(state.signPosition)
+  const mainContentBlocks = getEffectiveMainContentBlocks(state)
 
   const formattedDate = state.date
     ? (() => {
@@ -64,10 +66,6 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
     .split('\n')
     .map(l => l.trim())
     .filter(Boolean)
-
-  const mainContentLines = state.mainContent
-    .split('\n')
-    .filter(l => l.trim())
 
   const bodyStyle: React.CSSProperties = {
     marginBottom: '5pt',
@@ -92,9 +90,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
         wordBreak: 'break-word',
       }}
     >
-      {/* Document Header */}
       {isBienBan ? (
-        /* Biên bản: Quốc ngữ + Độc lập canh giữa toàn trang, không cơ quan ban hành */
         <div style={{ textAlign: 'center', marginBottom: '1.8rem' }}>
           <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
             CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
@@ -105,7 +101,6 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.8rem' }}>
-          {/* Cột trái 48%: Cơ quan */}
           <div style={{ width: '48%', textAlign: 'center' }}>
             <div style={{ fontSize: '12pt', textTransform: 'uppercase' }}>{state.agencyUpper}</div>
             <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>
@@ -124,7 +119,6 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
             )}
           </div>
 
-          {/* Cột phải 48%: Quốc hiệu */}
           <div style={{ width: '48%', textAlign: 'center' }}>
             <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
               CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
@@ -139,7 +133,6 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
         </div>
       )}
 
-      {/* Kính gửi / Tên loại văn bản */}
       <div style={{ marginBottom: '0.9rem' }}>
         {isCongVan ? (
           <div style={{ fontSize: '14pt', textAlign: 'center' }}>
@@ -160,9 +153,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
         )}
       </div>
 
-      {/* Nội dung văn bản */}
       <div style={{ minHeight: '80mm', lineHeight: '1.5' }}>
-        {/* Căn cứ pháp lý */}
         {legalBasisLines.length > 0 && (
           <div style={{ marginBottom: '0.5rem' }}>
             {legalBasisLines.map((line, i) => (
@@ -173,25 +164,44 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           </div>
         )}
 
-        {/* Đặt vấn đề */}
         {state.issueStatement && (
           <div style={{ ...bodyStyle, marginBottom: '0.5rem', ...(isHeadingLine(state.issueStatement) ? { fontWeight: 'bold' } : {}) }}>
             {renderHighlighted(state.issueStatement, highlightWords, onWordDoubleClick)}
           </div>
         )}
 
-        {/* Nội dung chính — mỗi dòng là một đoạn riêng */}
-        {mainContentLines.length > 0 && (
+        {mainContentBlocks.length > 0 && (
           <div style={{ marginBottom: '0.5rem' }}>
-            {mainContentLines.map((line, i) => (
-              <div key={i} style={{ ...bodyStyle, ...(isHeadingLine(line) ? { fontWeight: 'bold' } : {}) }}>
-                {renderHighlighted(line, highlightWords, onWordDoubleClick)}
-              </div>
-            ))}
+            {mainContentBlocks.map((block, i) =>
+              block.type === 'table' ? (
+                <table
+                  key={i}
+                  style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.5rem', textIndent: 0 }}
+                >
+                  <tbody>
+                    {block.rows.map((row, rowIndex) => (
+                      <tr key={rowIndex}>
+                        {row.map((cell, cellIndex) => (
+                          <td
+                            key={cellIndex}
+                            style={{ border: '1px solid #000', padding: '4pt 6pt', verticalAlign: 'top', textAlign: 'left' }}
+                          >
+                            {renderHighlighted(cell, highlightWords, onWordDoubleClick)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div key={i} style={{ ...bodyStyle, ...(isHeadingLine(block.text) ? { fontWeight: 'bold' } : {}) }}>
+                  {renderHighlighted(block.text, highlightWords, onWordDoubleClick)}
+                </div>
+              )
+            )}
           </div>
         )}
 
-        {/* Kết luận */}
         {state.conclusion && (
           <div style={{ ...bodyStyle, marginBottom: '0.5rem', ...(isHeadingLine(state.conclusion) ? { fontWeight: 'bold' } : {}) }}>
             {renderHighlighted(state.conclusion, highlightWords, onWordDoubleClick)}
@@ -199,13 +209,13 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
         )}
       </div>
 
-      {/* Footer: Nơi nhận / Đại diện bên A + Chữ ký / Đại diện bên B */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-        {/* Cột trái */}
         <div style={{ width: '42%' }}>
-          <div style={{ fontSize: '12pt', fontWeight: 'bold', fontStyle: 'italic', textDecoration: 'underline', marginBottom: '4pt' }}>
-            {isBienBan ? 'ĐẠI DIỆN BÊN A' : 'Nơi nhận:'}
-          </div>
+          {!isBienBan && (
+            <div style={{ fontSize: '12pt', fontWeight: 'bold', fontStyle: 'italic', textDecoration: 'underline', marginBottom: '4pt' }}>
+              Nơi nhận:
+            </div>
+          )}
           {isBienBan ? (
             <>
               <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
@@ -225,13 +235,9 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
 
         </div>
 
-        {/* Cột phải: Chữ ký / Đại diện bên B */}
         <div style={{ width: '50%', textAlign: 'center' }}>
           {isBienBan ? (
             <>
-              <div style={{ fontSize: '12pt', fontWeight: 'bold', fontStyle: 'italic', textDecoration: 'underline', marginBottom: '4pt' }}>
-                ĐẠI DIỆN BÊN B
-              </div>
               <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
                 {state.partyBUnit}
               </div>

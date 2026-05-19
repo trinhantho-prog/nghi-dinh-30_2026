@@ -21,7 +21,6 @@ const addPunctuation = (line: string, isLast: boolean): string => {
 
 const emptyLine = () => new Paragraph({ children: [new TextRun({ text: '', font: 'Times New Roman', size: 28 })] })
 
-// "nil" forces OOXML to suppress borders completely (stronger than "none")
 const noBorder = {
   top: { style: 'nil' as (typeof BorderStyle)[keyof typeof BorderStyle], size: 0 },
   bottom: { style: 'nil' as (typeof BorderStyle)[keyof typeof BorderStyle], size: 0 },
@@ -45,6 +44,15 @@ function isHeadingLine(line: string): boolean {
   return /^(VII|III|VI|IV|II|I|V|\d+)(?!\.\d+\.\d)[.)\s]/i.test(line.trim())
 }
 
+function createBodyParagraph(text: string, bold = false) {
+  return new Paragraph({
+    alignment: AlignmentType.BOTH,
+    indent: { firstLine: 720 },
+    spacing: { after: 100, line: 360, lineRule: LineRuleType.AUTO },
+    children: [new TextRun({ text, font: 'Times New Roman', size: 28, bold })],
+  })
+}
+
 export async function exportDocx(state: DocumentState) {
   const isCongVan = state.docType === 'cong-van'
   const isBienBan = state.docType === 'bien-ban'
@@ -62,8 +70,6 @@ export async function exportDocx(state: DocumentState) {
   const legalBasisLines = state.legalBasis.split('\n').map(l => l.trim()).filter(Boolean)
   const recipientsCcLines = state.recipientsCc.split('\n').map(l => l.trim()).filter(Boolean)
   const mainContentLines = state.mainContent.split('\n').filter(l => l.trim())
-
-  const bodyIndent = { firstLine: convertInchesToTwip(0.5) } // 1.27cm
 
   const doc = new Document({
     sections: [{
@@ -98,7 +104,6 @@ export async function exportDocx(state: DocumentState) {
         }),
       },
       children: [
-        // Header: Biên bản → Quốc ngữ canh giữa toàn trang; các loại khác → Cơ quan | Quốc hiệu 2 cột
         ...(isBienBan ? [
           new Paragraph({ alignment: AlignmentType.CENTER, children: [
             new TextRun({ text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', font: 'Times New Roman', bold: true, size: 24, allCaps: true, characterSpacing: -20 }),
@@ -170,7 +175,6 @@ export async function exportDocx(state: DocumentState) {
 
         emptyLine(),
 
-        // Kính gửi / Tên loại văn bản
         ...(isCongVan ? [
           new Paragraph({ alignment: AlignmentType.CENTER, children: [
             new TextRun({ text: `Kính gửi: ${state.recipient}`, font: 'Times New Roman', size: 28 }),
@@ -186,39 +190,16 @@ export async function exportDocx(state: DocumentState) {
 
         emptyLine(),
 
-        // Căn cứ pháp lý
-        ...legalBasisLines.map((line, i) => new Paragraph({
-          alignment: AlignmentType.BOTH,
-          indent: bodyIndent,
-          children: [
-            new TextRun({ text: addPunctuation(line, i === legalBasisLines.length - 1), font: 'Times New Roman', size: 28 }),
-          ],
-        })),
+        ...legalBasisLines.map((line, i) => createBodyParagraph(addPunctuation(line, i === legalBasisLines.length - 1))),
 
-        // Đặt vấn đề
-        ...(state.issueStatement ? [new Paragraph({
-          alignment: AlignmentType.BOTH,
-          indent: bodyIndent,
-          children: [new TextRun({ text: state.issueStatement, font: 'Times New Roman', size: 28, bold: isHeadingLine(state.issueStatement) })],
-        })] : []),
+        ...(state.issueStatement ? [createBodyParagraph(state.issueStatement, isHeadingLine(state.issueStatement))] : []),
 
-        // Nội dung chính — mỗi dòng là một đoạn riêng
-        ...mainContentLines.map(line => new Paragraph({
-          alignment: AlignmentType.BOTH,
-          indent: bodyIndent,
-          children: [new TextRun({ text: line, font: 'Times New Roman', size: 28, bold: isHeadingLine(line) })],
-        })),
+        ...mainContentLines.map(line => createBodyParagraph(line, isHeadingLine(line))),
 
-        // Kết luận
-        ...(state.conclusion ? [new Paragraph({
-          alignment: AlignmentType.BOTH,
-          indent: bodyIndent,
-          children: [new TextRun({ text: state.conclusion, font: 'Times New Roman', size: 28, bold: isHeadingLine(state.conclusion) })],
-        })] : []),
+        ...(state.conclusion ? [createBodyParagraph(state.conclusion, isHeadingLine(state.conclusion))] : []),
 
         emptyLine(),
 
-        // Footer: Nơi nhận/Đại diện bên A + Chữ ký/Đại diện bên B
         new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
           borders: noBorder,
@@ -227,9 +208,6 @@ export async function exportDocx(state: DocumentState) {
               width: { size: 50, type: WidthType.PERCENTAGE },
               borders: noBorder,
               children: isBienBan ? [
-                new Paragraph({ children: [
-                  new TextRun({ text: 'ĐẠI DIỆN BÊN A', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
-                ]}),
                 new Paragraph({ alignment: AlignmentType.CENTER, children: [
                   new TextRun({ text: state.partyAUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
                 ]}),
@@ -258,9 +236,6 @@ export async function exportDocx(state: DocumentState) {
               width: { size: 50, type: WidthType.PERCENTAGE },
               borders: noBorder,
               children: isBienBan ? [
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: 'ĐẠI DIỆN BÊN B', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
-                ]}),
                 new Paragraph({ alignment: AlignmentType.CENTER, children: [
                   new TextRun({ text: state.partyBUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
                 ]}),
