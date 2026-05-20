@@ -156,18 +156,9 @@ export async function exportDocx(state: DocumentState) {
           ]}),
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 0 },
+            spacing: { before: 0, after: 120 },
             children: [
               new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', font: 'Times New Roman', bold: true, size: 26 }),
-            ],
-          }),
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 120, line: 160, lineRule: LineRuleType.EXACTLY },
-            indent: { left: cmToTwip(5.85), right: cmToTwip(5.85) },
-            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
-            children: [
-              new TextRun({ text: '', font: 'Times New Roman', size: 16 }),
             ],
           }),
         ] : [
