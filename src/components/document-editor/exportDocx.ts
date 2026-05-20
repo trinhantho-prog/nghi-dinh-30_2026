@@ -202,11 +202,6 @@ export async function exportDocx(state: DocumentState) {
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [
             new TextRun({ text: state.docSummary, font: 'Times New Roman', bold: true, size: 28, italics: isBienBan }),
           ]}),
-          ...(isBienBan ? [
-            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [
-              new TextRun({ text: formattedDate, font: 'Times New Roman', italics: true, size: 26 }),
-            ]}),
-          ] : []),
         ]),
 
         emptyLine(),
