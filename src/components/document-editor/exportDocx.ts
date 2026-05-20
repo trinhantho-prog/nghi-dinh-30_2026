@@ -20,6 +20,7 @@ const addPunctuation = (line: string, isLast: boolean): string => {
 }
 
 const emptyLine = () => new Paragraph({ children: [new TextRun({ text: '', font: 'Times New Roman', size: 28 })] })
+const cmToTwip = (cm: number) => Math.round(convertInchesToTwip(cm / 2.54))
 
 const noBorder = {
   top: { style: 'nil' as (typeof BorderStyle)[keyof typeof BorderStyle], size: 0 },
@@ -44,12 +45,12 @@ function isHeadingLine(line: string): boolean {
   return /^(VII|III|VI|IV|II|I|V|\d+)(?!\.\d+\.\d)[.)\s]/i.test(line.trim())
 }
 
-function createBodyParagraph(text: string, bold = false) {
+function createBodyParagraph(text: string, bold = false, fontSize = 28) {
   return new Paragraph({
     alignment: AlignmentType.BOTH,
-    indent: { firstLine: 720 },
+    indent: { firstLine: cmToTwip(1.27) },
     spacing: { after: 100, line: 360, lineRule: LineRuleType.AUTO },
-    children: [new TextRun({ text, font: 'Times New Roman', size: 28, bold })],
+    children: [new TextRun({ text, font: 'Times New Roman', size: fontSize, bold })],
   })
 }
 
@@ -57,6 +58,7 @@ export async function exportDocx(state: DocumentState) {
   const isCongVan = state.docType === 'cong-van'
   const isBienBan = state.docType === 'bien-ban'
   const isDeputy = /phó/i.test(state.signPosition)
+  const bodyFontSize = isBienBan ? 26 : 28
 
   const formattedDate = state.date
     ? (() => {
@@ -75,12 +77,19 @@ export async function exportDocx(state: DocumentState) {
     sections: [{
       properties: {
         page: {
-          margin: {
-            top: convertInchesToTwip(0.79),
-            right: convertInchesToTwip(0.59),
-            bottom: convertInchesToTwip(0.79),
-            left: convertInchesToTwip(1.18),
-          },
+          margin: isBienBan
+            ? {
+                top: cmToTwip(2.0),
+                right: cmToTwip(2.0),
+                bottom: cmToTwip(2.0),
+                left: cmToTwip(3.0),
+              }
+            : {
+                top: convertInchesToTwip(0.79),
+                right: convertInchesToTwip(0.59),
+                bottom: convertInchesToTwip(0.79),
+                left: convertInchesToTwip(1.18),
+              },
         },
         titlePage: true,
       },
@@ -105,16 +114,16 @@ export async function exportDocx(state: DocumentState) {
       },
       children: [
         ...(isBienBan ? [
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [
             new TextRun({ text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', font: 'Times New Roman', bold: true, size: 24, allCaps: true, characterSpacing: -20 }),
           ]}),
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [
             new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', font: 'Times New Roman', bold: true, size: 26 }),
           ]}),
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 0, line: 160, lineRule: LineRuleType.EXACTLY },
-            children: [new TextRun({ text: '______________________________________', font: 'Times New Roman', bold: true, size: 16 })],
+            spacing: { before: 0, after: 0, line: 100, lineRule: LineRuleType.EXACTLY },
+            children: [new TextRun({ text: '___________________________', font: 'Times New Roman', bold: true, size: 16 })],
           }),
         ] : [
           new Table({
@@ -190,13 +199,13 @@ export async function exportDocx(state: DocumentState) {
 
         emptyLine(),
 
-        ...legalBasisLines.map((line, i) => createBodyParagraph(addPunctuation(line, i === legalBasisLines.length - 1))),
+        ...legalBasisLines.map((line, i) => createBodyParagraph(addPunctuation(line, i === legalBasisLines.length - 1), false, bodyFontSize)),
 
-        ...(state.issueStatement ? [createBodyParagraph(state.issueStatement, isHeadingLine(state.issueStatement))] : []),
+        ...(state.issueStatement ? [createBodyParagraph(state.issueStatement, isHeadingLine(state.issueStatement), bodyFontSize)] : []),
 
-        ...mainContentLines.map(line => createBodyParagraph(line, isHeadingLine(line))),
+        ...mainContentLines.map(line => createBodyParagraph(line, isHeadingLine(line), bodyFontSize)),
 
-        ...(state.conclusion ? [createBodyParagraph(state.conclusion, isHeadingLine(state.conclusion))] : []),
+        ...(state.conclusion ? [createBodyParagraph(state.conclusion, isHeadingLine(state.conclusion), bodyFontSize)] : []),
 
         emptyLine(),
 
