@@ -48,7 +48,7 @@ function isHeadingLine(line: string): boolean {
 function createBodyParagraph(text: string, bold = false, fontSize = 28) {
   return new Paragraph({
     alignment: AlignmentType.BOTH,
-    indent: { firstLine: cmToTwip(1.27) },
+    indent: { firstLine: cmToTwip(1.27), left: 0 },
     spacing: { after: 100, line: 360, lineRule: LineRuleType.AUTO },
     children: [new TextRun({ text, font: 'Times New Roman', size: fontSize, bold })],
   })
@@ -117,13 +117,15 @@ export async function exportDocx(state: DocumentState) {
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [
             new TextRun({ text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', font: 'Times New Roman', bold: true, size: 24, allCaps: true, characterSpacing: -20 }),
           ]}),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [
-            new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', font: 'Times New Roman', bold: true, size: 26 }),
-          ]}),
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 0, line: 100, lineRule: LineRuleType.EXACTLY },
-            children: [new TextRun({ text: '___________________________', font: 'Times New Roman', bold: true, size: 16 })],
+            spacing: { before: 0, after: 0 },
+            border: {
+              bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+            },
+            children: [
+              new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', font: 'Times New Roman', bold: true, size: 26 }),
+            ],
           }),
         ] : [
           new Table({
