@@ -13,10 +13,9 @@ const DOC_TYPE_TITLES: Record<string, string> = {
   'bien-ban': 'BIÊN BẢN',
 }
 
-const addPunctuation = (line: string, isLast: boolean): string => {
-  const expected = isLast ? ',' : ';'
+const addPunctuation = (line: string): string => {
   const stripped = line.replace(/[;,]\s*$/, '')
-  return `${stripped}${expected}`
+  return `${stripped};`
 }
 
 const emptyLine = () => new Paragraph({ children: [new TextRun({ text: '', font: 'Times New Roman', size: 28 })] })
@@ -29,6 +28,13 @@ const noBorder = {
   right: { style: 'nil' as (typeof BorderStyle)[keyof typeof BorderStyle], size: 0 },
   insideH: { style: 'nil' as (typeof BorderStyle)[keyof typeof BorderStyle], size: 0 },
   insideV: { style: 'nil' as (typeof BorderStyle)[keyof typeof BorderStyle], size: 0 },
+}
+
+const noCellMargins = {
+  top: 0,
+  bottom: 0,
+  left: 0,
+  right: 0,
 }
 
 function removeVietnameseDiacritics(str: string): string {
@@ -128,6 +134,8 @@ export async function exportDocx(state: DocumentState) {
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { before: 0, after: 120, line: 160, lineRule: LineRuleType.EXACTLY },
+            indent: { left: 4070, right: 4070 },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
             children: [
               new TextRun({ text: '', font: 'Times New Roman', size: 16 }),
             ],
@@ -206,7 +214,7 @@ export async function exportDocx(state: DocumentState) {
 
         emptyLine(),
 
-        ...legalBasisLines.map((line, i) => createBodyParagraph(addPunctuation(line, i === legalBasisLines.length - 1), false, bodyFontSize)),
+        ...legalBasisLines.map((line) => createBodyParagraph(addPunctuation(line), false, bodyFontSize)),
 
         ...(state.issueStatement ? [createBodyParagraph(state.issueStatement, isHeadingLine(state.issueStatement), bodyFontSize)] : []),
 
@@ -223,6 +231,7 @@ export async function exportDocx(state: DocumentState) {
             new TableCell({
               width: { size: 50, type: WidthType.PERCENTAGE },
               borders: noBorder,
+              margins: isBienBan ? noCellMargins : undefined,
               children: isBienBan ? [
                 new Paragraph({ alignment: AlignmentType.CENTER, children: [
                   new TextRun({ text: state.partyAUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
@@ -251,6 +260,7 @@ export async function exportDocx(state: DocumentState) {
             new TableCell({
               width: { size: 50, type: WidthType.PERCENTAGE },
               borders: noBorder,
+              margins: isBienBan ? noCellMargins : undefined,
               children: isBienBan ? [
                 new Paragraph({ alignment: AlignmentType.CENTER, children: [
                   new TextRun({ text: state.partyBUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),

@@ -10,10 +10,9 @@ const DOC_TYPE_TITLES: Record<string, string> = {
   'bien-ban': 'BIÊN BẢN',
 }
 
-const addPunctuation = (line: string, isLast: boolean): string => {
-  const expected = isLast ? ',' : ';'
+const addPunctuation = (line: string): string => {
   const stripped = line.replace(/[;,]\s*$/, '')
-  return `${stripped}${expected}`
+  return `${stripped};`
 }
 
 const isHeadingLine = (line: string): boolean =>
@@ -95,9 +94,10 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
             CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
           </div>
-          <div style={{ fontSize: '13pt', fontWeight: 'bold', display: 'inline-block', borderBottom: '1px solid black' }}>
+          <div style={{ fontSize: '13pt', fontWeight: 'bold' }}>
             Độc lập - Tự do - Hạnh phúc
           </div>
+          <div style={{ height: '1px', background: '#000', width: '4.9cm', margin: '1pt auto 0' }} />
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.8rem' }}>
@@ -158,7 +158,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           <div style={{ marginBottom: '0.5rem' }}>
             {legalBasisLines.map((line, i) => (
               <div key={i} style={bodyStyle}>
-                {renderHighlighted(addPunctuation(line, i === legalBasisLines.length - 1), highlightWords, onWordDoubleClick)}
+                {renderHighlighted(addPunctuation(line), highlightWords, onWordDoubleClick)}
               </div>
             ))}
           </div>
@@ -210,7 +210,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-        <div style={{ width: '42%' }}>
+        <div style={{ width: '42%', textAlign: isBienBan ? 'center' : 'left' }}>
           {!isBienBan && (
             <div style={{ fontSize: '12pt', fontWeight: 'bold', fontStyle: 'italic', textDecoration: 'underline', marginBottom: '4pt' }}>
               Nơi nhận:
