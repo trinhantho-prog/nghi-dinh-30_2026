@@ -53,7 +53,7 @@ export default function SettingsClient({ tenantId, tenantName, isAdmin, agencies
   async function signOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.push('/login')
+    router.replace('/login')
   }
 
   return (
