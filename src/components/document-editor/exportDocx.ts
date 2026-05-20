@@ -4,7 +4,8 @@ import {
   LineRuleType, convertInchesToTwip, Header, PageNumber,
 } from 'docx'
 import { saveAs } from 'file-saver'
-import { DocumentState } from '@/types'
+import { DocumentState, MainContentBlock } from '@/types'
+import { getEffectiveMainContentBlocks } from './mainContentBlocks'
 
 const DOC_TYPE_TITLES: Record<string, string> = {
   'bao-cao': 'BÁO CÁO',
@@ -52,13 +53,42 @@ function isHeadingLine(line: string): boolean {
 }
 
 function createBodyParagraph(text: string, bold = false, fontSize = 28) {
-  const isHeading = bold && isHeadingLine(text)
   return new Paragraph({
     alignment: AlignmentType.BOTH,
+    contextualSpacing: true,
     indent: { firstLine: cmToTwip(1.27), left: 0 },
-    spacing: { before: isHeading ? 60 : 0, after: 60, line: 360, lineRule: LineRuleType.AUTO },
+    spacing: { before: 120, after: 120, line: 240, lineRule: LineRuleType.AUTO },
     children: [new TextRun({ text, font: 'Times New Roman', size: fontSize, bold })],
   })
+}
+
+function createTableBlock(block: Extract<MainContentBlock, { type: 'table' }>, fontSize = 28) {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: block.rows.map(row => new TableRow({
+      children: row.map(cell => new TableCell({
+        borders: {
+          top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+          bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+          left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+          right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+        },
+        margins: { top: 80, bottom: 80, left: 120, right: 120 },
+        children: [new Paragraph({
+          alignment: AlignmentType.LEFT,
+          children: [new TextRun({ text: cell, font: 'Times New Roman', size: fontSize })],
+        })],
+      })),
+    })),
+  })
+}
+
+function createMainContentElements(blocks: MainContentBlock[], fontSize = 28) {
+  return blocks.map(block =>
+    block.type === 'table'
+      ? createTableBlock(block, fontSize)
+      : createBodyParagraph(block.text, isHeadingLine(block.text), fontSize)
+  )
 }
 
 export async function exportDocx(state: DocumentState) {
@@ -78,7 +108,7 @@ export async function exportDocx(state: DocumentState) {
 
   const legalBasisLines = state.legalBasis.split('\n').map(l => l.trim()).filter(Boolean)
   const recipientsCcLines = state.recipientsCc.split('\n').map(l => l.trim()).filter(Boolean)
-  const mainContentLines = state.mainContent.split('\n').filter(l => l.trim())
+  const mainContentBlocks = getEffectiveMainContentBlocks(state)
 
   const doc = new Document({
     sections: [{
@@ -134,7 +164,7 @@ export async function exportDocx(state: DocumentState) {
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { before: 0, after: 120, line: 160, lineRule: LineRuleType.EXACTLY },
-            indent: { left: 4070, right: 4070 },
+            indent: { left: cmToTwip(5.55), right: cmToTwip(5.55) },
             border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
             children: [
               new TextRun({ text: '', font: 'Times New Roman', size: 16 }),
@@ -208,7 +238,7 @@ export async function exportDocx(state: DocumentState) {
             new TextRun({ text: DOC_TYPE_TITLES[state.docType] || '', font: 'Times New Roman', bold: true, size: 32, allCaps: true }),
           ]}),
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [
-            new TextRun({ text: state.docSummary, font: 'Times New Roman', bold: true, size: 28, italics: isBienBan }),
+            new TextRun({ text: state.docSummary, font: 'Times New Roman', bold: !isBienBan, size: 28, italics: false }),
           ]}),
         ]),
 
@@ -218,85 +248,108 @@ export async function exportDocx(state: DocumentState) {
 
         ...(state.issueStatement ? [createBodyParagraph(state.issueStatement, isHeadingLine(state.issueStatement), bodyFontSize)] : []),
 
-        ...mainContentLines.map(line => createBodyParagraph(line, isHeadingLine(line), bodyFontSize)),
+        ...createMainContentElements(mainContentBlocks, bodyFontSize),
 
         ...(state.conclusion ? [createBodyParagraph(state.conclusion, isHeadingLine(state.conclusion), bodyFontSize)] : []),
 
         emptyLine(),
 
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          borders: noBorder,
-          rows: [new TableRow({ children: [
-            new TableCell({
-              width: { size: 50, type: WidthType.PERCENTAGE },
-              borders: noBorder,
-              margins: isBienBan ? noCellMargins : undefined,
-              children: isBienBan ? [
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: state.partyAUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
-                ]}),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: state.partyAPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
-                ]}),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: state.partyAName, font: 'Times New Roman', bold: true, size: 28 }),
-                ]}),
-              ] : [
-                new Paragraph({ children: [
-                  new TextRun({ text: 'Nơi nhận:', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
-                ]}),
-                ...recipientsCcLines.map(line => new Paragraph({
-                  children: [new TextRun({ text: line, font: 'Times New Roman', size: 22 })],
-                })),
-              ],
-            }),
-            new TableCell({
-              width: { size: 50, type: WidthType.PERCENTAGE },
-              borders: noBorder,
-              margins: isBienBan ? noCellMargins : undefined,
-              children: isBienBan ? [
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: state.partyBUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
-                ]}),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: state.partyBPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
-                ]}),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: state.partyBName, font: 'Times New Roman', bold: true, size: 28 }),
-                ]}),
-              ] : [
-                ...(isDeputy ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: 'KT. GIÁM ĐỐC', font: 'Times New Roman', bold: true, size: 28 }),
-                ]})] : []),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: state.signPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
-                ]}),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                emptyLine(),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                  new TextRun({ text: state.signName, font: 'Times New Roman', bold: true, size: 28 }),
-                ]}),
-              ],
-            }),
-          ]})],
-        }),
+        ...(isBienBan ? [
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: noBorder,
+            rows: [
+              new TableRow({ children: [
+                new TableCell({
+                  width: { size: 50, type: WidthType.PERCENTAGE },
+                  borders: noBorder,
+                  margins: noCellMargins,
+                  children: [
+                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                      new TextRun({ text: state.partyAUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                    ]}),
+                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                      new TextRun({ text: state.partyAPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                    ]}),
+                  ],
+                }),
+                new TableCell({
+                  width: { size: 50, type: WidthType.PERCENTAGE },
+                  borders: noBorder,
+                  margins: noCellMargins,
+                  children: [
+                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                      new TextRun({ text: state.partyBUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                    ]}),
+                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                      new TextRun({ text: state.partyBPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                    ]}),
+                  ],
+                }),
+              ]}),
+              new TableRow({ children: [
+                new TableCell({ borders: noBorder, margins: noCellMargins, children: [emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine()] }),
+                new TableCell({ borders: noBorder, margins: noCellMargins, children: [emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine()] }),
+              ]}),
+              new TableRow({ children: [
+                new TableCell({
+                  borders: noBorder,
+                  margins: noCellMargins,
+                  children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: state.partyAName, font: 'Times New Roman', bold: true, size: 28 }),
+                  ]})],
+                }),
+                new TableCell({
+                  borders: noBorder,
+                  margins: noCellMargins,
+                  children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: state.partyBName, font: 'Times New Roman', bold: true, size: 28 }),
+                  ]})],
+                }),
+              ]}),
+            ],
+          }),
+        ] : [
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: noBorder,
+            rows: [new TableRow({ children: [
+              new TableCell({
+                width: { size: 50, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                children: [
+                  new Paragraph({ children: [
+                    new TextRun({ text: 'Nơi nhận:', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
+                  ]}),
+                  ...recipientsCcLines.map(line => new Paragraph({
+                    children: [new TextRun({ text: line, font: 'Times New Roman', size: 22 })],
+                  })),
+                ],
+              }),
+              new TableCell({
+                width: { size: 50, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                children: [
+                  ...(isDeputy ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: 'KT. GIÁM ĐỐC', font: 'Times New Roman', bold: true, size: 28 }),
+                  ]})] : []),
+                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: state.signPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                  ]}),
+                  emptyLine(),
+                  emptyLine(),
+                  emptyLine(),
+                  emptyLine(),
+                  emptyLine(),
+                  emptyLine(),
+                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: state.signName, font: 'Times New Roman', bold: true, size: 28 }),
+                  ]}),
+                ],
+              }),
+            ]})],
+          }),
+        ]),
       ],
     }],
   })

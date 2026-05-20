@@ -143,7 +143,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
             <div style={{ fontSize: '16pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
               {docTypeTitle}
             </div>
-            <div style={{ fontSize: '14pt', marginTop: '4pt', whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
+            <div style={{ fontSize: '14pt', marginTop: '4pt', whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontWeight: isBienBan ? 'normal' : undefined, fontStyle: 'normal' }}>
               {state.docSummary}
             </div>
             {state.docSummary && (
@@ -209,56 +209,50 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
         )}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-        <div style={{ width: '42%', textAlign: isBienBan ? 'center' : 'left' }}>
-          {!isBienBan && (
+      {isBienBan ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '8%', marginTop: '1rem', textAlign: 'center' }}>
+          <div>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+              {state.partyAUnit}
+            </div>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+              {state.partyAPosition}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+              {state.partyBUnit}
+            </div>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+              {state.partyBPosition}
+            </div>
+          </div>
+          <div style={{ height: '90px' }} />
+          <div style={{ height: '90px' }} />
+          <div style={{ fontWeight: 'bold' }}>{state.partyAName}</div>
+          <div style={{ fontWeight: 'bold' }}>{state.partyBName}</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
+          <div style={{ width: '42%', textAlign: 'left' }}>
             <div style={{ fontSize: '12pt', fontWeight: 'bold', fontStyle: 'italic', textDecoration: 'underline', marginBottom: '4pt' }}>
               Nơi nhận:
             </div>
-          )}
-          {isBienBan ? (
-            <>
-              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
-                {state.partyAUnit}
-              </div>
-              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
-                {state.partyAPosition}
-              </div>
-              <div style={{ height: '90px' }} />
-              <div style={{ fontWeight: 'bold' }}>{state.partyAName}</div>
-            </>
-          ) : (
-            recipientsCcLines.map((line, i) => (
+            {recipientsCcLines.map((line, i) => (
               <div key={i} style={{ fontSize: '11pt' }}>{line}</div>
-            ))
-          )}
+            ))}
+          </div>
 
+          <div style={{ width: '50%', textAlign: 'center' }}>
+            {isDeputy && (
+              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>KT. GIÁM ĐỐC</div>
+            )}
+            <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{state.signPosition}</div>
+            <div style={{ height: '90px' }} />
+            <div style={{ fontWeight: 'bold' }}>{state.signName}</div>
+          </div>
         </div>
-
-        <div style={{ width: '50%', textAlign: 'center' }}>
-          {isBienBan ? (
-            <>
-              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
-                {state.partyBUnit}
-              </div>
-              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
-                {state.partyBPosition}
-              </div>
-              <div style={{ height: '90px' }} />
-              <div style={{ fontWeight: 'bold' }}>{state.partyBName}</div>
-            </>
-          ) : (
-            <>
-              {isDeputy && (
-                <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>KT. GIÁM ĐỐC</div>
-              )}
-              <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{state.signPosition}</div>
-              <div style={{ height: '90px' }} />
-              <div style={{ fontWeight: 'bold' }}>{state.signName}</div>
-            </>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   )
 }
