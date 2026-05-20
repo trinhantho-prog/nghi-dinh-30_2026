@@ -46,10 +46,13 @@ function isHeadingLine(line: string): boolean {
 }
 
 function createBodyParagraph(text: string, bold = false, fontSize = 28) {
+  const isHeading = bold && isHeadingLine(text)
   return new Paragraph({
-    alignment: AlignmentType.BOTH,
-    indent: { firstLine: cmToTwip(1.27), left: 0 },
-    spacing: { after: 100, line: 360, lineRule: LineRuleType.AUTO },
+    alignment: isHeading ? AlignmentType.LEFT : AlignmentType.BOTH,
+    indent: isHeading
+      ? { firstLine: 0, left: 0 }
+      : { firstLine: cmToTwip(1.27), left: 0 },
+    spacing: { before: isHeading ? 120 : 0, after: 100, line: 360, lineRule: LineRuleType.AUTO },
     children: [new TextRun({ text, font: 'Times New Roman', size: fontSize, bold })],
   })
 }
@@ -120,11 +123,15 @@ export async function exportDocx(state: DocumentState) {
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { before: 0, after: 0 },
-            border: {
-              bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
-            },
             children: [
               new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', font: 'Times New Roman', bold: true, size: 26 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 0, after: 120, line: 160, lineRule: LineRuleType.EXACTLY },
+            children: [
+              new TextRun({ text: '', font: 'Times New Roman', size: 16 }),
             ],
           }),
         ] : [
