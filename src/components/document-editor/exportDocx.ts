@@ -58,7 +58,7 @@ function createBodyParagraph(text: string, bold = false, fontSize = 28) {
     contextualSpacing: true,
     indent: { firstLine: cmToTwip(1.27), left: 0 },
     spacing: { before: 120, after: 120, line: 240, lineRule: LineRuleType.AUTO },
-    children: [new TextRun({ text, font: 'Times New Roman', size: fontSize, bold })],
+    children: [new TextRun({ text: text.trimStart(), font: 'Times New Roman', size: fontSize, bold })],
   })
 }
 
@@ -164,7 +164,7 @@ export async function exportDocx(state: DocumentState) {
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { before: 0, after: 120, line: 160, lineRule: LineRuleType.EXACTLY },
-            indent: { left: cmToTwip(5.55), right: cmToTwip(5.55) },
+            indent: { left: cmToTwip(5.65), right: cmToTwip(5.65) },
             border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
             children: [
               new TextRun({ text: '', font: 'Times New Roman', size: 16 }),
@@ -288,8 +288,8 @@ export async function exportDocx(state: DocumentState) {
                 }),
               ]}),
               new TableRow({ children: [
-                new TableCell({ borders: noBorder, margins: noCellMargins, children: [emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine()] }),
-                new TableCell({ borders: noBorder, margins: noCellMargins, children: [emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine()] }),
+                new TableCell({ borders: noBorder, margins: noCellMargins, children: [emptyLine(), emptyLine(), emptyLine(), emptyLine()] }),
+                new TableCell({ borders: noBorder, margins: noCellMargins, children: [emptyLine(), emptyLine(), emptyLine(), emptyLine()] }),
               ]}),
               new TableRow({ children: [
                 new TableCell({
