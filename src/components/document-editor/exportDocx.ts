@@ -48,11 +48,9 @@ function isHeadingLine(line: string): boolean {
 function createBodyParagraph(text: string, bold = false, fontSize = 28) {
   const isHeading = bold && isHeadingLine(text)
   return new Paragraph({
-    alignment: isHeading ? AlignmentType.LEFT : AlignmentType.BOTH,
-    indent: isHeading
-      ? { firstLine: 0, left: 0 }
-      : { firstLine: cmToTwip(1.27), left: 0 },
-    spacing: { before: isHeading ? 120 : 0, after: 100, line: 360, lineRule: LineRuleType.AUTO },
+    alignment: AlignmentType.BOTH,
+    indent: { firstLine: cmToTwip(1.27), left: 0 },
+    spacing: { before: isHeading ? 60 : 0, after: 60, line: 360, lineRule: LineRuleType.AUTO },
     children: [new TextRun({ text, font: 'Times New Roman', size: fontSize, bold })],
   })
 }
@@ -198,12 +196,17 @@ export async function exportDocx(state: DocumentState) {
             new TextRun({ text: `Kính gửi: ${state.recipient}`, font: 'Times New Roman', size: 28 }),
           ]}),
         ] : [
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [
             new TextRun({ text: DOC_TYPE_TITLES[state.docType] || '', font: 'Times New Roman', bold: true, size: 32, allCaps: true }),
           ]}),
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [
-            new TextRun({ text: state.docSummary, font: 'Times New Roman', size: 28 }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [
+            new TextRun({ text: state.docSummary, font: 'Times New Roman', bold: true, size: 28, italics: isBienBan }),
           ]}),
+          ...(isBienBan ? [
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [
+              new TextRun({ text: formattedDate, font: 'Times New Roman', italics: true, size: 26 }),
+            ]}),
+          ] : []),
         ]),
 
         emptyLine(),
