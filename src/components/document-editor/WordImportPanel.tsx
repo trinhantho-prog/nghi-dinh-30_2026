@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 
 interface WordImportPanelProps {
   onApply: (text: string) => void
+  mainContent?: string
 }
 
 type Provider = 'anthropic' | 'gemini' | 'deepseek'
@@ -16,7 +17,13 @@ const PROVIDERS: { value: Provider; label: string; placeholder: string; storageK
 
 const ACCEPTED = '.docx,.doc,.pdf,.xlsx,.xls'
 
-export default function WordImportPanel({ onApply }: WordImportPanelProps) {
+const REWRITE_PROMPT = `Hãy phân tích cấu trúc đoạn văn của tôi trong mục "Nội dung chính". Sau đó viết lại bằng cách tạo sự biến đổi linh hoạt về độ dài câu.
+Hãy xen kẽ:
+- Những câu cực ngắn, dồn lực mạnh trong khoảng 3 từ
+- Với những câu dài hơn, giàu chiều sâu và phức tạp hơn
+Loại bỏ hoàn toàn kiểu đoạn văn đều đều, nhịp điệu lặp lại giống hệt nhau — thứ khiến người đọc nhận ra ngay là văn bản do AI tạo ra.`
+
+export default function WordImportPanel({ onApply, mainContent = '' }: WordImportPanelProps) {
   const [provider, setProvider] = useState<Provider>('anthropic')
   const [apiKeys, setApiKeys] = useState<Record<Provider, string>>({ anthropic: '', gemini: '', deepseek: '' })
   const [prompt, setPrompt] = useState('')
@@ -24,8 +31,11 @@ export default function WordImportPanel({ onApply }: WordImportPanelProps) {
   const [docContent, setDocContent] = useState('')
   const [isParsing, setIsParsing] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [rewriteLoading, setRewriteLoading] = useState(false)
   const [result, setResult] = useState('')
+  const [rewriteResult, setRewriteResult] = useState('')
   const [error, setError] = useState('')
+  const [rewriteError, setRewriteError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -99,6 +109,36 @@ export default function WordImportPanel({ onApply }: WordImportPanelProps) {
 
   async function handleCopy() {
     await navigator.clipboard.writeText(result)
+  }
+
+  async function handleRewriteContent() {
+    const apiKey = apiKeys[provider]
+    if (!apiKey.trim()) return
+    if (!mainContent.trim()) {
+      setRewriteError('Mục "Nội dung chính" đang trống. Vui lòng nhập nội dung trước.')
+      return
+    }
+    setRewriteLoading(true)
+    setRewriteError('')
+    setRewriteResult('')
+    try {
+      const userMessage = `Nội dung chính:\n\n${mainContent}\n\n---\n\n${REWRITE_PROMPT}`
+      const res = await fetch('/api/ai/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: apiKey.trim(), prompt: userMessage, provider }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Lỗi gọi AI')
+      }
+      const data = await res.json()
+      setRewriteResult(data.suggestion)
+    } catch (e: unknown) {
+      setRewriteError(e instanceof Error ? e.message : 'Lỗi không xác định')
+    } finally {
+      setRewriteLoading(false)
+    }
   }
 
   const inputCls = 'w-full px-3 py-[0.55rem] border-[1.5px] border-[#dde1ef] rounded-[6px] text-[0.855rem] font-[inherit] bg-white text-[#1a1f36] focus:outline-none focus:border-[#1a56b0] focus:ring-2 focus:ring-[#1a56b0]/10'
@@ -219,6 +259,56 @@ export default function WordImportPanel({ onApply }: WordImportPanelProps) {
           </div>
         </div>
       )}
+
+      {/* Divider */}
+      <div className="border-t border-dashed border-[#ddd6fe] pt-3">
+        <div className="text-[0.72rem] font-bold text-[#7c3aed] uppercase tracking-wider mb-2">✏️ Gợi ý chỉnh văn phong</div>
+
+        <button
+          onClick={handleRewriteContent}
+          disabled={rewriteLoading || !apiKeys[provider].trim()}
+          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-[#7c3aed] to-[#4f46e5] text-white hover:from-[#6d28d9] hover:to-[#4338ca] disabled:opacity-50 transition-all shadow-sm"
+        >
+          {rewriteLoading
+            ? <><span className="animate-spin inline-block">⏳</span> Đang viết lại...</>
+            : <>✍️ Gợi ý chỉnh nội dung</>
+          }
+        </button>
+        <div className="text-[0.67rem] text-[#9ca3af] mt-1 leading-snug">
+          AI sẽ viết lại "Nội dung chính" với câu ngắn–dài xen kẽ, tránh nhịp đều AI.
+        </div>
+
+        {rewriteError && (
+          <div className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {rewriteError}
+          </div>
+        )}
+
+        {rewriteResult && (
+          <div className="mt-2 bg-white border-[1.5px] border-[#c3d0f5] rounded-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-[#f5f3ff] to-[#eef2ff] px-3 py-2 flex justify-between items-center border-b border-[#dde4f5]">
+              <span className="text-xs font-bold text-[#7c3aed]">✍️ Nội dung đã viết lại</span>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => navigator.clipboard.writeText(rewriteResult)}
+                  className="text-xs bg-[#ede9fe] text-[#7c3aed] px-2 py-1 rounded font-semibold hover:bg-[#ddd6fe] transition-colors"
+                >
+                  📋 Copy
+                </button>
+                <button
+                  onClick={() => onApply(rewriteResult)}
+                  className="text-xs bg-[#7c3aed] text-white px-2 py-1 rounded font-semibold hover:bg-[#6d28d9] transition-colors"
+                >
+                  Áp dụng
+                </button>
+              </div>
+            </div>
+            <div className="p-3 text-xs text-[#374151] whitespace-pre-wrap max-h-52 overflow-y-auto leading-relaxed">
+              {rewriteResult}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

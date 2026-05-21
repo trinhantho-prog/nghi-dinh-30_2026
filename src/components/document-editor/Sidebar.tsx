@@ -243,6 +243,7 @@ export default function Sidebar({
           <SectionTitle className="text-[#7c3aed] border-[#ddd6fe]">7. Import Word &amp; Gợi ý nội dung (AI)</SectionTitle>
           <WordImportPanel
             onApply={(text) => dispatch({ type: 'SET_FIELD', field: 'mainContent', value: text })}
+            mainContent={state.mainContent}
           />
         </section>
 
