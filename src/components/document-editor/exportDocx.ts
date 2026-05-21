@@ -15,7 +15,7 @@ const DOC_TYPE_TITLES: Record<string, string> = {
 }
 
 const addPunctuation = (line: string): string => {
-  const stripped = line.replace(/[;,]\s*$/, '')
+  const stripped = line.replace(/[.;:,]\s*$/, '')
   return `${stripped};`
 }
 
@@ -195,16 +195,7 @@ export async function exportDocx(state: DocumentState) {
               new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', font: 'Times New Roman', bold: true, size: 26 }),
             ],
           }),
-          // Dòng kẻ 5.7cm căn giữa dưới "Độc lập - Tự do - Hạnh phúc"
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 120, line: 160, lineRule: LineRuleType.EXACTLY },
-            indent: { left: cmToTwip(4.65), right: cmToTwip(4.65) },
-            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
-            children: [
-              new TextRun({ text: '', font: 'Times New Roman', size: 16 }),
-            ],
-          }),
+          new Paragraph({ spacing: { before: 0, after: 120 }, children: [] }),
         ] : [
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
