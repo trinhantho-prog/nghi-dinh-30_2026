@@ -19,6 +19,22 @@ const addPunctuation = (line: string): string => {
   return `${stripped};`
 }
 
+const stripEndingPunctuation = (line: string): string => line.trim().replace(/[.;:,]+\s*$/, '')
+
+// Mục La Mã I-VII → dấu ":", mục số 1-9 → dấu ".", đoạn văn thường → dấu "."
+const normalizeBodyText = (text: string): string => {
+  const stripped = stripEndingPunctuation(text)
+  if (/^(VII|VI|IV|III|II|I|V)[.)\s]/i.test(stripped)) return `${stripped}:`
+  if (/^[1-9][.)\s]/.test(stripped)) return `${stripped}.`
+  return `${stripped}.`
+}
+
+// Chuẩn hóa đoạn văn tự do (trích yếu, nội dung chính, kết luận): luôn kết thúc bằng dấu "."
+const normalizeFreeText = (text: string): string => {
+  const stripped = stripEndingPunctuation(text)
+  return stripped ? `${stripped}.` : text
+}
+
 const emptyLine = () => new Paragraph({ children: [new TextRun({ text: '', font: 'Times New Roman', size: 28 })] })
 const cmToTwip = (cm: number) => Math.round(convertInchesToTwip(cm / 2.54))
 
@@ -52,19 +68,21 @@ function isHeadingLine(line: string): boolean {
   return /^(VII|III|VI|IV|II|I|V|\d+)(?!\.\d+\.\d)[.)\s]/i.test(line.trim())
 }
 
-function createBodyParagraph(text: string, bold = false, fontSize = 28) {
+function createBodyParagraph(text: string, bold = false, fontSize = 28, isFreeText = false) {
+  const normalizedText = isFreeText ? normalizeFreeText(text) : normalizeBodyText(text)
   return new Paragraph({
     alignment: AlignmentType.BOTH,
     contextualSpacing: true,
     indent: { firstLine: cmToTwip(1.27), left: 0 },
     spacing: { before: 0, after: 120, line: 300, lineRule: LineRuleType.EXACTLY },
-    children: [new TextRun({ text: text.trimStart(), font: 'Times New Roman', size: fontSize, bold })],
+    children: [new TextRun({ text: normalizedText, font: 'Times New Roman', size: fontSize, bold })],
   })
 }
 
 function createTableBlock(block: Extract<MainContentBlock, { type: 'table' }>, fontSize = 28) {
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
+    // spacing trước/sau bảng = 0 để không có khoảng trống
     rows: block.rows.map(row => new TableRow({
       children: row.map(cell => new TableCell({
         borders: {
@@ -76,6 +94,7 @@ function createTableBlock(block: Extract<MainContentBlock, { type: 'table' }>, f
         margins: { top: 80, bottom: 80, left: 120, right: 120 },
         children: [new Paragraph({
           alignment: AlignmentType.LEFT,
+          spacing: { before: 0, after: 0 },
           children: [new TextRun({ text: cell, font: 'Times New Roman', size: fontSize })],
         })],
       })),
@@ -83,12 +102,27 @@ function createTableBlock(block: Extract<MainContentBlock, { type: 'table' }>, f
   })
 }
 
+// Bọc bảng với paragraph rỗng spacing=0 trước/sau để không có khoảng trắng
+function createTableWithNoSpacing(block: Extract<MainContentBlock, { type: 'table' }>, fontSize = 28) {
+  const noSpacingPara = new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })
+  return [noSpacingPara, createTableBlock(block, fontSize), noSpacingPara]
+}
+
 function createMainContentElements(blocks: MainContentBlock[], fontSize = 28) {
-  return blocks.map(block =>
-    block.type === 'table'
-      ? createTableBlock(block, fontSize)
-      : createBodyParagraph(block.text, isHeadingLine(block.text), fontSize)
-  )
+  const elements: (Paragraph | Table)[] = []
+  for (const block of blocks) {
+    if (block.type === 'table') {
+      // Paragraph trước bảng với spacing=0
+      elements.push(new Paragraph({ spacing: { before: 0, after: 0 }, children: [] }))
+      elements.push(createTableBlock(block, fontSize))
+      // Paragraph sau bảng với spacing=0
+      elements.push(new Paragraph({ spacing: { before: 0, after: 0 }, children: [] }))
+    } else {
+      // Nội dung chính: dùng normalizeBodyText theo heading hay đoạn văn
+      elements.push(createBodyParagraph(block.text, isHeadingLine(block.text), fontSize))
+    }
+  }
+  return elements
 }
 
 export async function exportDocx(state: DocumentState) {
@@ -156,9 +190,19 @@ export async function exportDocx(state: DocumentState) {
           ]}),
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 120 },
+            spacing: { before: 0, after: 0 },
             children: [
               new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', font: 'Times New Roman', bold: true, size: 26 }),
+            ],
+          }),
+          // Dòng kẻ 5.7cm căn giữa dưới "Độc lập - Tự do - Hạnh phúc"
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 0, after: 120, line: 160, lineRule: LineRuleType.EXACTLY },
+            indent: { left: cmToTwip(4.65), right: cmToTwip(4.65) },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
+            children: [
+              new TextRun({ text: '', font: 'Times New Roman', size: 16 }),
             ],
           }),
         ] : [
@@ -228,8 +272,9 @@ export async function exportDocx(state: DocumentState) {
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [
             new TextRun({ text: DOC_TYPE_TITLES[state.docType] || '', font: 'Times New Roman', bold: true, size: 32, allCaps: true }),
           ]}),
+          // Trích yếu nội dung: font 13pt (size 26), Times New Roman, kết thúc bằng dấu "."
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [
-            new TextRun({ text: state.docSummary, font: 'Times New Roman', bold: !isBienBan, size: 28, italics: false }),
+            new TextRun({ text: state.docSummary ? normalizeFreeText(state.docSummary) : '', font: 'Times New Roman', bold: !isBienBan, size: 26, italics: false }),
           ]}),
         ]),
 
@@ -237,11 +282,13 @@ export async function exportDocx(state: DocumentState) {
 
         ...legalBasisLines.map((line) => createBodyParagraph(addPunctuation(line), false, bodyFontSize)),
 
-        ...(state.issueStatement ? [createBodyParagraph(state.issueStatement, isHeadingLine(state.issueStatement), bodyFontSize)] : []),
+        // Câu đặt vấn đề: ngay sát nội dung chính, không có khoảng cách
+        ...(state.issueStatement ? [createBodyParagraph(state.issueStatement, isHeadingLine(state.issueStatement), bodyFontSize, true)] : []),
 
         ...createMainContentElements(mainContentBlocks, bodyFontSize),
 
-        ...(state.conclusion ? [createBodyParagraph(state.conclusion, isHeadingLine(state.conclusion), bodyFontSize)] : []),
+        // Kết luận/yêu cầu: luôn kết thúc bằng dấu "."
+        ...(state.conclusion ? [createBodyParagraph(state.conclusion, isHeadingLine(state.conclusion), bodyFontSize, true)] : []),
 
         emptyLine(),
 
@@ -256,11 +303,13 @@ export async function exportDocx(state: DocumentState) {
                   borders: noBorder,
                   margins: noCellMargins,
                   children: [
+                    // Tên cơ quan bên A: font 13pt (size 26), Times New Roman
                     new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                      new TextRun({ text: state.partyAUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                      new TextRun({ text: state.partyAUnit, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
                     ]}),
+                    // Chức vụ bên A: font 13pt (size 26), Times New Roman
                     new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                      new TextRun({ text: state.partyAPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                      new TextRun({ text: state.partyAPosition, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
                     ]}),
                   ],
                 }),
@@ -269,11 +318,13 @@ export async function exportDocx(state: DocumentState) {
                   borders: noBorder,
                   margins: noCellMargins,
                   children: [
+                    // Tên cơ quan bên B: font 13pt (size 26), Times New Roman
                     new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                      new TextRun({ text: state.partyBUnit, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                      new TextRun({ text: state.partyBUnit, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
                     ]}),
+                    // Chức vụ bên B: font 13pt (size 26), Times New Roman
                     new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                      new TextRun({ text: state.partyBPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                      new TextRun({ text: state.partyBPosition, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
                     ]}),
                   ],
                 }),
@@ -286,15 +337,17 @@ export async function exportDocx(state: DocumentState) {
                 new TableCell({
                   borders: noBorder,
                   margins: noCellMargins,
+                  // Họ và tên bên A: font 13pt (size 26), Times New Roman
                   children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                    new TextRun({ text: state.partyAName, font: 'Times New Roman', bold: true, size: 28 }),
+                    new TextRun({ text: state.partyAName, font: 'Times New Roman', bold: true, size: 26 }),
                   ]})],
                 }),
                 new TableCell({
                   borders: noBorder,
                   margins: noCellMargins,
+                  // Họ và tên bên B: font 13pt (size 26), Times New Roman
                   children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                    new TextRun({ text: state.partyBName, font: 'Times New Roman', bold: true, size: 28 }),
+                    new TextRun({ text: state.partyBName, font: 'Times New Roman', bold: true, size: 26 }),
                   ]})],
                 }),
               ]}),

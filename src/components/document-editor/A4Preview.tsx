@@ -15,6 +15,22 @@ const addPunctuation = (line: string): string => {
   return `${stripped};`
 }
 
+const stripEndingPunctuation = (line: string): string => line.trim().replace(/[.;:,]+\s*$/, '')
+
+// Mục La Mã I-VII → dấu ":", mục số 1-9 → dấu ".", đoạn văn thường → dấu "."
+const normalizeBodyText = (text: string): string => {
+  const stripped = stripEndingPunctuation(text)
+  if (/^(VII|VI|IV|III|II|I|V)[.)\s]/i.test(stripped)) return `${stripped}:`
+  if (/^[1-9][.)\s]/.test(stripped)) return `${stripped}.`
+  return `${stripped}.`
+}
+
+// Chuẩn hóa đoạn văn tự do (trích yếu, kết luận, câu đặt vấn đề): luôn kết thúc bằng dấu "."
+const normalizeFreeText = (text: string): string => {
+  const stripped = stripEndingPunctuation(text)
+  return stripped ? `${stripped}.` : text
+}
+
 const isHeadingLine = (line: string): boolean =>
   /^(VII|III|VI|IV|II|I|V|\d+)(?!\.\d+\.\d)[.)\s]/i.test(line.trim())
 
@@ -97,7 +113,8 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           <div style={{ fontSize: '13pt', fontWeight: 'bold' }}>
             Độc lập - Tự do - Hạnh phúc
           </div>
-          <div style={{ height: '1px', background: '#000', width: '4.9cm', margin: '1pt auto 0' }} />
+          {/* Dòng kẻ 5.7cm căn giữa */}
+          <div style={{ height: '1px', background: '#000', width: '5.7cm', margin: '1pt auto 0' }} />
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.8rem' }}>
@@ -143,8 +160,9 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
             <div style={{ fontSize: '16pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
               {docTypeTitle}
             </div>
-            <div style={{ fontSize: '14pt', marginTop: '4pt', whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontWeight: isBienBan ? 'normal' : undefined, fontStyle: 'normal' }}>
-              {state.docSummary}
+            {/* Trích yếu nội dung: font 13pt, Times New Roman, kết thúc bằng dấu "." */}
+            <div style={{ fontSize: '13pt', marginTop: '4pt', whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontWeight: isBienBan ? 'normal' : undefined, fontStyle: 'normal', fontFamily: '"Times New Roman", Times, serif' }}>
+              {state.docSummary ? normalizeFreeText(state.docSummary) : ''}
             </div>
             {state.docSummary && (
               <div style={{ height: '1px', background: '#000', width: '4cm', margin: '3pt auto 0' }} />
@@ -164,19 +182,21 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           </div>
         )}
 
+        {/* Câu đặt vấn đề: ngay sát nội dung chính, không có khoảng cách thêm */}
         {state.issueStatement && (
-          <div style={{ ...bodyStyle, marginBottom: '0.5rem', ...(isHeadingLine(state.issueStatement) ? { fontWeight: 'bold' } : {}) }}>
-            {renderHighlighted(state.issueStatement, highlightWords, onWordDoubleClick)}
+          <div style={{ ...bodyStyle, marginBottom: '5pt', ...(isHeadingLine(state.issueStatement) ? { fontWeight: 'bold' } : {}) }}>
+            {renderHighlighted(normalizeFreeText(state.issueStatement), highlightWords, onWordDoubleClick)}
           </div>
         )}
 
         {mainContentBlocks.length > 0 && (
-          <div style={{ marginBottom: '0.5rem' }}>
+          <div>
             {mainContentBlocks.map((block, i) =>
               block.type === 'table' ? (
+                // Bảng từ Excel: không có khoảng trống trên/dưới (margin=0)
                 <table
                   key={i}
-                  style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.5rem', textIndent: 0 }}
+                  style={{ width: '100%', borderCollapse: 'collapse', margin: '0', textIndent: 0 }}
                 >
                   <tbody>
                     {block.rows.map((row, rowIndex) => (
@@ -195,16 +215,17 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
                 </table>
               ) : (
                 <div key={i} style={{ ...bodyStyle, ...(isHeadingLine(block.text) ? { fontWeight: 'bold' } : {}) }}>
-                  {renderHighlighted(block.text, highlightWords, onWordDoubleClick)}
+                  {renderHighlighted(normalizeBodyText(block.text), highlightWords, onWordDoubleClick)}
                 </div>
               )
             )}
           </div>
         )}
 
+        {/* Kết luận/Yêu cầu: luôn kết thúc bằng dấu "." */}
         {state.conclusion && (
           <div style={{ ...bodyStyle, marginBottom: '0.5rem', ...(isHeadingLine(state.conclusion) ? { fontWeight: 'bold' } : {}) }}>
-            {renderHighlighted(state.conclusion, highlightWords, onWordDoubleClick)}
+            {renderHighlighted(normalizeFreeText(state.conclusion), highlightWords, onWordDoubleClick)}
           </div>
         )}
       </div>
@@ -212,25 +233,31 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
       {isBienBan ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '8%', marginTop: '1rem', textAlign: 'center' }}>
           <div>
-            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+            {/* Tên cơ quan bên A: font 13pt, Times New Roman */}
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif' }}>
               {state.partyAUnit}
             </div>
-            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+            {/* Chức vụ bên A: font 13pt, Times New Roman */}
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif' }}>
               {state.partyAPosition}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+            {/* Tên cơ quan bên B: font 13pt, Times New Roman */}
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif' }}>
               {state.partyBUnit}
             </div>
-            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt' }}>
+            {/* Chức vụ bên B: font 13pt, Times New Roman */}
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif' }}>
               {state.partyBPosition}
             </div>
           </div>
           <div style={{ height: '90px' }} />
           <div style={{ height: '90px' }} />
-          <div style={{ fontWeight: 'bold' }}>{state.partyAName}</div>
-          <div style={{ fontWeight: 'bold' }}>{state.partyBName}</div>
+          {/* Họ và tên bên A: font 13pt, Times New Roman */}
+          <div style={{ fontWeight: 'bold', fontSize: '13pt', fontFamily: '"Times New Roman", Times, serif' }}>{state.partyAName}</div>
+          {/* Họ và tên bên B: font 13pt, Times New Roman */}
+          <div style={{ fontWeight: 'bold', fontSize: '13pt', fontFamily: '"Times New Roman", Times, serif' }}>{state.partyBName}</div>
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
