@@ -79,6 +79,17 @@ function createBodyParagraph(text: string, bold = false, fontSize = 28, isFreeTe
   })
 }
 
+// Căn cứ pháp lý: KHÔNG normalize lại để giữ nguyên dấu ";" từ addPunctuation
+function createLegalBasisParagraph(text: string, fontSize = 28) {
+  return new Paragraph({
+    alignment: AlignmentType.BOTH,
+    contextualSpacing: true,
+    indent: { firstLine: cmToTwip(1.27), left: 0 },
+    spacing: { before: 0, after: 120, line: 300, lineRule: LineRuleType.EXACTLY },
+    children: [new TextRun({ text, font: 'Times New Roman', size: fontSize, bold: false })],
+  })
+}
+
 function createTableBlock(block: Extract<MainContentBlock, { type: 'table' }>, fontSize = 28) {
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -271,7 +282,7 @@ export async function exportDocx(state: DocumentState) {
 
         emptyLine(),
 
-        ...legalBasisLines.map((line) => createBodyParagraph(addPunctuation(line), false, bodyFontSize)),
+        ...legalBasisLines.map((line) => createLegalBasisParagraph(addPunctuation(line), bodyFontSize)),
 
         // Câu đặt vấn đề: ngay sát nội dung chính, không có khoảng cách
         ...(state.issueStatement ? [createBodyParagraph(state.issueStatement, isHeadingLine(state.issueStatement), bodyFontSize, true)] : []),
