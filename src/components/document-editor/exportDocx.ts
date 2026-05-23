@@ -212,8 +212,8 @@ export async function exportDocx(state: DocumentState) {
             alignment: AlignmentType.CENTER,
             indent: { left: cmToTwip(mottoIndent), right: cmToTwip(mottoIndent) },
             border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
-            spacing: { before: 40, after: 120 },
-            children: [new TextRun({ text: '', font: 'Times New Roman' })],
+            spacing: { before: 0, after: 0, line: 20, lineRule: LineRuleType.EXACTLY },
+            children: [new TextRun({ text: '', font: 'Times New Roman', size: 2 })],
           }),
           new Paragraph({ spacing: { before: 0, after: 120 }, children: [] }),
         ] : [
@@ -261,8 +261,10 @@ export async function exportDocx(state: DocumentState) {
                   ]}),
                   new Paragraph({
                     alignment: AlignmentType.CENTER,
-                    spacing: { before: 0, after: 0, line: 160, lineRule: LineRuleType.EXACTLY },
-                    children: [new TextRun({ text: '______________________________________', font: 'Times New Roman', bold: true, size: 16 })],
+                    indent: { left: cmToTwip(1.4), right: cmToTwip(1.4) },
+                    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
+                    spacing: { before: 0, after: 0, line: 20, lineRule: LineRuleType.EXACTLY },
+                    children: [new TextRun({ text: '', font: 'Times New Roman', size: 2 })],
                   }),
                   emptyLine(),
                   new Paragraph({ alignment: AlignmentType.CENTER, children: [

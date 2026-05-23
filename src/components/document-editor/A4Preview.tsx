@@ -110,11 +110,11 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
             CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
           </div>
-          <div style={{ fontSize: '13pt', fontWeight: 'bold' }}>
+          <div style={{ fontSize: '13pt', fontWeight: 'bold', lineHeight: '1.1' }}>
             Độc lập - Tự do - Hạnh phúc
           </div>
           {/* Dòng kẻ 5.7cm căn giữa */}
-          <div style={{ height: '1px', background: '#000', width: '5.7cm', margin: '1pt auto 0' }} />
+          <div style={{ height: '1px', background: '#000', width: '5.7cm', margin: '2px auto 0' }} />
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.8rem' }}>
@@ -140,9 +140,10 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
             <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
               CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
             </div>
-            <div style={{ fontSize: '13pt', fontWeight: 'bold', display: 'inline-block', borderBottom: '1px solid black' }}>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', lineHeight: '1.1' }}>
               Độc lập - Tự do - Hạnh phúc
             </div>
+            <div style={{ height: '1px', background: 'black', width: '5.7cm', margin: '2px auto 0' }} />
             <div style={{ fontSize: '13pt', fontStyle: 'italic', marginTop: '4pt' }}>
               {formattedDate}
             </div>
