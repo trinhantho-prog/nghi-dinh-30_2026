@@ -65,9 +65,9 @@ async function callAnthropic(apiKey: string, systemPrompt: string, userMessage: 
   return data.content[0].text as string
 }
 
-async function callGemini(apiKey: string, systemPrompt: string, userMessage: string) {
+async function callGemini(apiKey: string, model: string, systemPrompt: string, userMessage: string) {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -125,14 +125,38 @@ export async function POST(request: Request) {
 
     let apiKey = customApiKey?.trim()
     let selectedProvider = provider
+    let model = 'gemini-2.5-flash' // default fallback
 
-    // Nếu không có custom key, tự động dùng server-side Gemini key
-    if (!apiKey) {
-      if (process.env.GEMINI_API_KEY) {
-        apiKey = process.env.GEMINI_API_KEY
-        selectedProvider = 'gemini'
-      } else {
-        return NextResponse.json({ error: 'Thiếu API Key để chạy AI Assistant' }, { status: 400 })
+    if (provider === 'gemini') {
+      // Nút Gemini (Trả phí)
+      if (!apiKey) {
+        apiKey = process.env.GEMINI_PAID_API_KEY || process.env.GEMINI_API_KEY
+      }
+      model = process.env.GEMINI_PAID_MODEL || 'gemini-2.5-pro'
+      if (!apiKey) {
+        return NextResponse.json({ error: 'Thiếu API Key cho Gemini trả phí' }, { status: 400 })
+      }
+    } else if (provider === 'anthropic') {
+      // Nút AI miễn phí (sử dụng Gemini Free)
+      selectedProvider = 'gemini'
+      apiKey = process.env.GEMINI_FREE_API_KEY || process.env.GEMINI_API_KEY
+      model = process.env.GEMINI_FREE_MODEL || 'gemini-2.5-flash-lite'
+      if (!apiKey) {
+        return NextResponse.json({ error: 'Thiếu API Key cho AI miễn phí' }, { status: 400 })
+      }
+    } else if (provider === 'deepseek') {
+      if (!apiKey) {
+        apiKey = process.env.DEEPSEEK_API_KEY
+      }
+      if (!apiKey) {
+        return NextResponse.json({ error: 'Thiếu API Key cho DeepSeek' }, { status: 400 })
+      }
+    } else {
+      if (!apiKey) {
+        apiKey = process.env.ANTHROPIC_API_KEY
+      }
+      if (!apiKey) {
+        return NextResponse.json({ error: 'Thiếu API Key' }, { status: 400 })
       }
     }
 
@@ -146,7 +170,7 @@ export async function POST(request: Request) {
 
     let suggestion: string
     if (selectedProvider === 'gemini') {
-      suggestion = await callGemini(apiKey, systemPrompt, userMessage)
+      suggestion = await callGemini(apiKey, model, systemPrompt, userMessage)
     } else if (selectedProvider === 'deepseek') {
       suggestion = await callDeepSeek(apiKey, systemPrompt, userMessage)
     } else {

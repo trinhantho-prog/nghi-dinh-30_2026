@@ -49,7 +49,7 @@ Hệ thống tuân thủ nghiêm ngặt quy định lề trang tiêu chuẩn c�
 
 ### 3.2. Đối với Biên bản
 *   Không sử dụng bảng hai cột ở đầu trang.
-*   Quốc hiệu, Tiêu ngữ và đường kẻ 5.7cm được căn đều chính giữa trang.
+*   Quốc hiệu, Tiêu ngữ được căn đều chính giữa trang. Phía dưới dòng tiêu ngữ có đường kẻ nét liền dài bằng **100%** độ dài của chuỗi chữ Tiêu ngữ ở cả file docx xuất ra (đã được bổ sung chuẩn) và web preview.
 
 ---
 
@@ -62,7 +62,7 @@ Hệ thống tuân thủ nghiêm ngặt quy định lề trang tiêu chuẩn c�
 
 ### 4.2. Đối với Báo cáo, Thông báo, Kế hoạch, Biên bản
 *   **Tên loại văn bản:** Căn giữa trang, in hoa đậm (**bold**), cỡ chữ **16pt** (Word size 32).
-*   **Trích yếu nội dung:** Căn giữa trang ngay dưới tên loại văn bản, cỡ chữ **13pt**, in thường, in đậm đối với Báo cáo/Thông báo/Kế hoạch, in thường không đậm đối với Biên bản. Tự động áp dụng quy tắc chuẩn hóa kết thúc bằng dấu chấm (`.`).
+*   **Trích yếu nội dung:** Căn giữa trang ngay dưới tên loại văn bản, cỡ chữ **13pt**, in thường, in đậm đối với Báo cáo/Thông báo/Kế hoạch, in thường không đậm đối với Biên bản. Định dạng trích yếu này **không có dấu chấm cuối câu** ở cả Web Preview và file DOCX xuất ra.
 *   **Đường kẻ phân tách:** Phía dưới trích yếu có đường kẻ ngang nét liền dài khoảng **4cm** nằm cân đối ở giữa.
 
 ---

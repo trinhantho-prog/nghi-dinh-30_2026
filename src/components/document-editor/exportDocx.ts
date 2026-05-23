@@ -206,6 +206,11 @@ export async function exportDocx(state: DocumentState) {
               new TextRun({ text: 'Độc lập - Tự do - Hạnh phúc', font: 'Times New Roman', bold: true, size: 26 }),
             ],
           }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 0, after: 0, line: 160, lineRule: LineRuleType.EXACTLY },
+            children: [new TextRun({ text: '______________________________________', font: 'Times New Roman', bold: true, size: 16 })],
+          }),
           new Paragraph({ spacing: { before: 0, after: 120 }, children: [] }),
         ] : [
           new Table({
@@ -274,9 +279,9 @@ export async function exportDocx(state: DocumentState) {
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [
             new TextRun({ text: DOC_TYPE_TITLES[state.docType] || '', font: 'Times New Roman', bold: true, size: 32, allCaps: true }),
           ]}),
-          // Trích yếu nội dung: font 13pt (size 26), Times New Roman, kết thúc bằng dấu "."
+          // Trích yếu nội dung: font 13pt (size 26), Times New Roman, KHÔNG có dấu chấm cuối câu
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [
-            new TextRun({ text: state.docSummary ? normalizeFreeText(state.docSummary) : '', font: 'Times New Roman', bold: !isBienBan, size: 26, italics: false }),
+            new TextRun({ text: state.docSummary ? stripEndingPunctuation(state.docSummary) : '', font: 'Times New Roman', bold: !isBienBan, size: 26, italics: false }),
           ]}),
         ]),
 

@@ -160,9 +160,9 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
             <div style={{ fontSize: '16pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
               {docTypeTitle}
             </div>
-            {/* Trích yếu nội dung: font 13pt, Times New Roman, kết thúc bằng dấu "." */}
+            {/* Trích yếu nội dung: font 13pt, Times New Roman, KHÔNG có dấu chấm cuối câu */}
             <div style={{ fontSize: '13pt', marginTop: '4pt', whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontWeight: isBienBan ? 'normal' : undefined, fontStyle: 'normal', fontFamily: '"Times New Roman", Times, serif' }}>
-              {state.docSummary ? normalizeFreeText(state.docSummary) : ''}
+              {state.docSummary ? stripEndingPunctuation(state.docSummary) : ''}
             </div>
             {state.docSummary && (
               <div style={{ height: '1px', background: '#000', width: '4cm', margin: '3pt auto 0' }} />

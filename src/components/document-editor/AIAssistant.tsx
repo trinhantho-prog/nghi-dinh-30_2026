@@ -39,7 +39,7 @@ const PART_STARTERS: Record<number, TransitionPhrase[]> = {
 }
 
 const PROVIDERS: { value: Provider; label: string; placeholder: string; storageKey: string; color: string }[] = [
-  { value: 'gemini', label: 'Gemini', placeholder: 'Sử dụng key hệ thống (miễn phí) hoặc nhập key riêng...', storageKey: 'ai-gemini-key', color: '#3b82f6' },
+  { value: 'gemini', label: 'Gemini', placeholder: 'Sử dụng key trả phí của hệ thống hoặc nhập key riêng...', storageKey: 'ai-gemini-key', color: '#3b82f6' },
   { value: 'deepseek', label: 'DeepSeek', placeholder: 'Nhập sk-...', storageKey: 'ai-deepseek-key', color: '#6366f1' },
   { value: 'anthropic', label: 'AI miễn phí', placeholder: 'Không cần cấu hình (Sử dụng miễn phí)...', storageKey: 'ai-anthropic-key', color: '#c97d4e' },
 ]
@@ -74,7 +74,9 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
     PROVIDERS.forEach(p => {
       loaded[p.value] = localStorage.getItem(p.storageKey) || ''
     })
-    setApiKeys(loaded)
+    setTimeout(() => {
+      setApiKeys(loaded)
+    }, 0)
   }, [])
 
   const handleKeyChange = (val: string) => {
@@ -310,10 +312,10 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
             />
           )}
           {provider === 'gemini' && !apiKeys.gemini && (
-            <div className="text-[9px] text-[#059669] font-medium mt-1">✓ Đã kích hoạt key hệ thống của máy chủ. Bạn có thể sử dụng trực tiếp không cần cấu hình.</div>
+            <div className="text-[9px] text-[#059669] font-medium mt-1">✓ Đã kích hoạt key hệ thống trả phí của máy chủ. Bạn có thể sử dụng trực tiếp không cần cấu hình.</div>
           )}
           {provider === 'anthropic' && (
-            <div className="text-[9px] text-[#059669] font-medium mt-1">✓ Đã kích hoạt tính năng AI miễn phí qua máy chủ. Không cần nhập key API.</div>
+            <div className="text-[9px] text-[#059669] font-medium mt-1">✓ Đã kích hoạt API Gemini 2.5 Flash Lite Free hệ thống. Không cần nhập key.</div>
           )}
         </div>
       </div>
