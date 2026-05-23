@@ -54,6 +54,11 @@ Trả về duy nhất một đối tượng JSON có thuộc tính "issues" là 
   ]
 }
 
+## LƯU Ý BẮT BUỘC VỀ ĐỊNH DẠNG JSON:
+- JSON PHẢI hoàn toàn hợp lệ, tuyệt đối không được cắt ngắn nửa chừng hay thiếu dấu đóng ngoặc.
+- Đối với bất kỳ dấu ngoặc kép nào xuất hiện TRONG văn bản thuộc tính (ví dụ: description, reason, suggestion), bạn BẮT BUỘC phải dùng ký tự escape \" (ví dụ: "description": "nhập dấu \\\"Tab\\\"" hoặc "Ủy ban \\\"nhân dân\\\"").
+- Tuyệt đối không để xảy ra lỗi cú pháp JSON.
+
 Nếu không có lỗi nào, trả về: {"issues": []}
 CHỈ trả về JSON thuần túy, không bọc trong \`\`\`json, không kèm lời chào hay giải thích thêm.`
 
@@ -83,7 +88,7 @@ async function callAnthropic(apiKey: string, prompt: string) {
     },
     body: JSON.stringify({
       model: 'claude-3-5-sonnet-latest',
-      max_tokens: 2000,
+      max_tokens: 4000,
       system: LINTER_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,
@@ -140,6 +145,7 @@ async function callDeepSeek(apiKey: string, prompt: string) {
       top_p: 0.1,
       presence_penalty: 0.0,
       frequency_penalty: 0.0,
+      max_tokens: 4000,
       response_format: { type: 'json_object' },
     }),
   })

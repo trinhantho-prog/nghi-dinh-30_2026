@@ -50,7 +50,7 @@ async function callAnthropic(apiKey: string, systemPrompt: string, userMessage: 
     },
     body: JSON.stringify({
       model: 'claude-3-5-sonnet-latest',
-      max_tokens: 2048,
+      max_tokens: 4000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
       temperature: 0.2,
@@ -77,6 +77,7 @@ async function callGemini(apiKey: string, systemPrompt: string, userMessage: str
         generationConfig: {
           temperature: 0.2,
           topP: 0.1,
+          maxOutputTokens: 4000,
         },
       }),
     }
@@ -106,6 +107,7 @@ async function callDeepSeek(apiKey: string, systemPrompt: string, userMessage: s
       top_p: 0.1,
       presence_penalty: 0.0,
       frequency_penalty: 0.0,
+      max_tokens: 4000,
     }),
   })
   if (!res.ok) {
