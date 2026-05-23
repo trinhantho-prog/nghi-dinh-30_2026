@@ -293,7 +293,7 @@ export async function exportDocx(state: DocumentState) {
               alignment: AlignmentType.CENTER,
               indent: { left: cmToTwip(summaryIndent), right: cmToTwip(summaryIndent) },
               border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
-              spacing: { before: 0, after: 120, line: 20, lineRule: LineRuleType.EXACTLY },
+              spacing: { before: 20, after: 120, line: 20, lineRule: LineRuleType.EXACTLY },
               children: [new TextRun({ text: '', font: 'Times New Roman', size: 2 })],
             }),
           ] : []),
