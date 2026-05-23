@@ -41,7 +41,7 @@ const PART_STARTERS: Record<number, TransitionPhrase[]> = {
 const PROVIDERS: { value: Provider; label: string; placeholder: string; storageKey: string; color: string }[] = [
   { value: 'gemini', label: 'Gemini', placeholder: 'Sử dụng key hệ thống (miễn phí) hoặc nhập key riêng...', storageKey: 'ai-gemini-key', color: '#3b82f6' },
   { value: 'deepseek', label: 'DeepSeek', placeholder: 'Nhập sk-...', storageKey: 'ai-deepseek-key', color: '#6366f1' },
-  { value: 'anthropic', label: 'Claude', placeholder: 'Nhập sk-ant-api03-...', storageKey: 'ai-anthropic-key', color: '#c97d4e' },
+  { value: 'anthropic', label: 'AI miễn phí', placeholder: 'Không cần cấu hình (Sử dụng miễn phí)...', storageKey: 'ai-anthropic-key', color: '#c97d4e' },
 ]
 
 export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssistantProps) {
@@ -300,15 +300,20 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
           ))}
         </div>
         <div>
-          <input
-            type="password"
-            value={apiKeys[provider]}
-            onChange={e => handleKeyChange(e.target.value)}
-            placeholder={PROVIDERS.find(p => p.value === provider)!.placeholder}
-            className={`${inputCls} font-mono text-[10px] py-1.5`}
-          />
+          {provider !== 'anthropic' && (
+            <input
+              type="password"
+              value={apiKeys[provider]}
+              onChange={e => handleKeyChange(e.target.value)}
+              placeholder={PROVIDERS.find(p => p.value === provider)!.placeholder}
+              className={`${inputCls} font-mono text-[10px] py-1.5`}
+            />
+          )}
           {provider === 'gemini' && !apiKeys.gemini && (
             <div className="text-[9px] text-[#059669] font-medium mt-1">✓ Đã kích hoạt key hệ thống của máy chủ. Bạn có thể sử dụng trực tiếp không cần cấu hình.</div>
+          )}
+          {provider === 'anthropic' && (
+            <div className="text-[9px] text-[#059669] font-medium mt-1">✓ Đã kích hoạt tính năng AI miễn phí qua máy chủ. Không cần nhập key API.</div>
           )}
         </div>
       </div>
@@ -519,8 +524,8 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
                   disabled={structureLoading}
                   className="text-left p-2 bg-white hover:bg-slate-50 rounded border border-[#dde1ef] hover:border-[#b4c6ef] text-[11px] transition-all flex flex-col gap-0.5 active:scale-[0.99]"
                 >
-                  <span className="font-bold text-[#1e293b] font-serif text-[11.5px] leading-snug">{phrase.text}</span>
-                  <span className="text-[9px] text-[#6b7597] italic">{phrase.desc}</span>
+                  <span className="text-[#1e293b] text-[11.5px] leading-snug font-normal" style={{ fontFamily: '"Times New Roman", Times, serif' }}>{phrase.text}</span>
+                  <span className="text-[9px] text-[#6b7597] italic" style={{ fontFamily: '"Times New Roman", Times, serif' }}>{phrase.desc}</span>
                 </button>
               ))}
             </div>
@@ -566,7 +571,7 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
                   </button>
                 </div>
               </div>
-              <div className="p-3 text-[11px] text-[#374151] whitespace-pre-wrap max-h-52 overflow-y-auto leading-relaxed font-serif">
+              <div className="p-3 text-[11px] text-[#374151] whitespace-pre-wrap max-h-52 overflow-y-auto leading-relaxed font-normal" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                 {structureResult}
               </div>
             </div>

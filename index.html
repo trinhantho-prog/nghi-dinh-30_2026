@@ -678,7 +678,7 @@
                     </button>
                     <button class="ai-provider-btn" id="provider-anthropic" onclick="selectProvider('anthropic')">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                        Claude
+                        AI miễn phí
                     </button>
                 </div>
 
@@ -723,7 +723,7 @@
 
                 <!-- Anthropic panel -->
                 <div id="anthropic-panel" style="display:none;">
-                    <p style="font-size:.73rem;color:#6b7597;margin-bottom:10px;line-height:1.5;">Sử dụng Claude AI tích hợp sẵn — chỉ hoạt động khi mở file này trong <strong>claude.ai</strong>. Không cần nhập key.</p>
+                    <p style="font-size:.73rem;color:#6b7597;margin-bottom:10px;line-height:1.5;">Tính năng AI miễn phí được kích hoạt qua máy chủ hệ thống. Không cần cấu hình key API.</p>
                 </div>
 
                 <button id="ai-check-btn" class="btn btn-ai" style="margin-bottom:8px;">
@@ -1601,7 +1601,7 @@ Nếu không có lỗi, trả về { "issues": [] }. Chỉ trả về JSON, khô
                 showAIResult(parseAIJson(content));
 
             } else {
-                showToast('⚠️ Claude AI chỉ hoạt động khi mở trong claude.ai', 'warning');
+                showToast('⚠️ Tính năng AI miễn phí chỉ hoạt động trong ứng dụng Next.js', 'warning');
             }
 
         } catch (err) {
