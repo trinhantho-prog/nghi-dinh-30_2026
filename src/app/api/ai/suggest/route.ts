@@ -53,6 +53,8 @@ async function callAnthropic(apiKey: string, systemPrompt: string, userMessage: 
       max_tokens: 2048,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
+      temperature: 0.2,
+      top_p: 0.1,
     }),
   })
   if (!res.ok) {
@@ -72,6 +74,10 @@ async function callGemini(apiKey: string, systemPrompt: string, userMessage: str
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+        generationConfig: {
+          temperature: 0.2,
+          topP: 0.1,
+        },
       }),
     }
   )
@@ -96,6 +102,10 @@ async function callDeepSeek(apiKey: string, systemPrompt: string, userMessage: s
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
+      temperature: 0.2,
+      top_p: 0.1,
+      presence_penalty: 0.0,
+      frequency_penalty: 0.0,
     }),
   })
   if (!res.ok) {

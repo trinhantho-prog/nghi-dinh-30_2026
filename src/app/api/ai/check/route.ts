@@ -86,6 +86,8 @@ async function callAnthropic(apiKey: string, prompt: string) {
       max_tokens: 2000,
       system: LINTER_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      top_p: 0.1,
     }),
   })
   if (!res.ok) {
@@ -105,7 +107,11 @@ async function callGemini(apiKey: string, prompt: string) {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: LINTER_SYSTEM_PROMPT }] },
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json' },
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+          topP: 0.1,
+        },
       }),
     }
   )
@@ -130,6 +136,10 @@ async function callDeepSeek(apiKey: string, prompt: string) {
         { role: 'system', content: LINTER_SYSTEM_PROMPT },
         { role: 'user', content: prompt },
       ],
+      temperature: 0.1,
+      top_p: 0.1,
+      presence_penalty: 0.0,
+      frequency_penalty: 0.0,
       response_format: { type: 'json_object' },
     }),
   })

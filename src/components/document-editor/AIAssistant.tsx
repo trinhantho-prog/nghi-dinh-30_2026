@@ -101,7 +101,7 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
         type: 'warning',
         description: 'Thụt lề thủ công',
         suggestion: 'Xóa khoảng trắng ở đầu dòng',
-        reason: 'Hệ thống đã tự động thụt lề 1.27cm cho mỗi đoạn theo chuẩn NĐ 30, việc tự ý nhập dấu cách hoặc tab sẽ làm sai lệch căn lề.'
+        reason: 'Theo Nghị định 30/2020/NĐ-CP, khoảng cách lùi đầu dòng quy định là 1.0 cm hoặc 1.27 cm (được hệ thống tự động căn chỉnh qua CSS). Việc tự ý chèn dấu cách hoặc Tab thủ công ở đầu dòng sẽ gây sai lệch thể thức.'
       } as AIIssue)
     }
 
