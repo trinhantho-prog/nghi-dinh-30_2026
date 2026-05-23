@@ -2,8 +2,7 @@
 
 import { Dispatch, useEffect, useRef, useState } from 'react'
 import { DocumentState, DocType, Agency, Signer, AIIssue } from '@/types'
-import AIPanel from './AIPanel'
-import WordImportPanel from './WordImportPanel'
+import AIAssistant from './AIAssistant'
 
 type Action =
   | { type: 'SET_FIELD'; field: keyof DocumentState; value: string }
@@ -225,25 +224,13 @@ export default function Sidebar({
           )}
         </section>
 
-        {/* 6. AI Kiểm tra */}
-        <section className="bg-[#f0f4ff] border-[1.5px] border-[#c3d0f5] rounded-lg p-4">
-          <SectionTitle className="text-[#3b52bf] border-[#c3d0f5]">6. Kiểm tra lỗi chính tả (AI)</SectionTitle>
-          <AIPanel
-            documentState={state}
-            onFixIssue={(field, wrong, correct) => {
-              const cur = (state[field] as string) || ''
-              dispatch({ type: 'SET_FIELD', field, value: cur.replaceAll(wrong, correct) })
-            }}
+        {/* 6. Trợ lý AI Hành chính */}
+        <section className="bg-gradient-to-br from-[#f8fafc] to-[#f0f4ff] border-[1.5px] border-[#c3d0f5] rounded-lg p-4 shadow-sm">
+          <SectionTitle className="text-[#1a56b0] border-[#c3d0f5]">6. Trợ lý Thể thức &amp; Ngôn ngữ AI</SectionTitle>
+          <AIAssistant
+            state={state}
+            dispatch={dispatch}
             onIssuesChange={onIssuesChange}
-          />
-        </section>
-
-        {/* 7. Import Word & Gợi ý AI */}
-        <section className="bg-[#f5f3ff] border-[1.5px] border-[#ddd6fe] rounded-lg p-4">
-          <SectionTitle className="text-[#7c3aed] border-[#ddd6fe]">7. Import Word &amp; Gợi ý nội dung (AI)</SectionTitle>
-          <WordImportPanel
-            onApply={(text) => dispatch({ type: 'SET_FIELD', field: 'mainContent', value: text })}
-            mainContent={state.mainContent}
           />
         </section>
 

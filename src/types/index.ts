@@ -117,4 +117,6 @@ export interface AIIssue {
   type: 'warning' | 'error'
   description: string
   suggestion: string
+  fieldKey?: string
+  reason?: string
 }
