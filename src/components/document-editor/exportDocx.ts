@@ -141,6 +141,8 @@ export async function exportDocx(state: DocumentState) {
   const isBienBan = state.docType === 'bien-ban'
   const isDeputy = /phó/i.test(state.signPosition)
   const bodyFontSize = isBienBan ? 26 : 28
+  const mottoIndent = isBienBan ? 5.15 : 5.4
+  const summaryIndent = isBienBan ? 6.0 : 6.25
 
   const formattedDate = state.date
     ? (() => {
@@ -208,8 +210,10 @@ export async function exportDocx(state: DocumentState) {
           }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 0, line: 160, lineRule: LineRuleType.EXACTLY },
-            children: [new TextRun({ text: '______________________________________', font: 'Times New Roman', bold: true, size: 16 })],
+            indent: { left: cmToTwip(mottoIndent), right: cmToTwip(mottoIndent) },
+            border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
+            spacing: { before: 40, after: 120 },
+            children: [new TextRun({ text: '', font: 'Times New Roman' })],
           }),
           new Paragraph({ spacing: { before: 0, after: 120 }, children: [] }),
         ] : [
@@ -283,6 +287,15 @@ export async function exportDocx(state: DocumentState) {
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [
             new TextRun({ text: state.docSummary ? stripEndingPunctuation(state.docSummary) : '', font: 'Times New Roman', bold: !isBienBan, size: 26, italics: false }),
           ]}),
+          ...(state.docSummary ? [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              indent: { left: cmToTwip(summaryIndent), right: cmToTwip(summaryIndent) },
+              border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
+              spacing: { before: 60, after: 120 },
+              children: [new TextRun({ text: '', font: 'Times New Roman' })],
+            }),
+          ] : []),
         ]),
 
         emptyLine(),
