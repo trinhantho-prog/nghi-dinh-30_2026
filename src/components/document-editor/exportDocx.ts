@@ -228,13 +228,14 @@ export async function exportDocx(state: DocumentState) {
                   new Paragraph({ alignment: AlignmentType.CENTER, children: [
                     new TextRun({ text: state.agencyUpper, font: 'Times New Roman', size: 24, allCaps: true }),
                   ]}),
-                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [
                     new TextRun({ text: state.agencyMain, font: 'Times New Roman', bold: true, size: 24, allCaps: true, characterSpacing: -20 }),
                   ]}),
                   new Paragraph({
                     indent: { left: 827, right: 827 },
                     border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
-                    children: [new TextRun({ text: '', font: 'Times New Roman' })],
+                    spacing: { before: 0, after: 0, line: 20, lineRule: LineRuleType.EXACTLY },
+                    children: [new TextRun({ text: '', font: 'Times New Roman', size: 2 })],
                   }),
                   emptyLine(),
                   new Paragraph({ alignment: AlignmentType.CENTER, children: [
@@ -284,7 +285,7 @@ export async function exportDocx(state: DocumentState) {
             new TextRun({ text: DOC_TYPE_TITLES[state.docType] || '', font: 'Times New Roman', bold: true, size: 32, allCaps: true }),
           ]}),
           // Trích yếu nội dung: font 13pt (size 26), Times New Roman, KHÔNG có dấu chấm cuối câu
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [
             new TextRun({ text: state.docSummary ? stripEndingPunctuation(state.docSummary) : '', font: 'Times New Roman', bold: !isBienBan, size: 26, italics: false }),
           ]}),
           ...(state.docSummary ? [
@@ -292,8 +293,8 @@ export async function exportDocx(state: DocumentState) {
               alignment: AlignmentType.CENTER,
               indent: { left: cmToTwip(summaryIndent), right: cmToTwip(summaryIndent) },
               border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
-              spacing: { before: 60, after: 120 },
-              children: [new TextRun({ text: '', font: 'Times New Roman' })],
+              spacing: { before: 0, after: 120, line: 20, lineRule: LineRuleType.EXACTLY },
+              children: [new TextRun({ text: '', font: 'Times New Roman', size: 2 })],
             }),
           ] : []),
         ]),
