@@ -327,13 +327,17 @@ export async function exportDocx(state: DocumentState) {
                   margins: noCellMargins,
                   children: [
                     // Tên cơ quan bên A: font 13pt (size 26), Times New Roman
-                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                      new TextRun({ text: state.partyAUnit, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
-                    ]}),
+                    ...state.partyAUnit.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                        new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
+                      ]})
+                    ),
                     // Chức vụ bên A: font 13pt (size 26), Times New Roman
-                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                      new TextRun({ text: state.partyAPosition, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
-                    ]}),
+                    ...state.partyAPosition.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                        new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
+                      ]})
+                    ),
                   ],
                 }),
                 new TableCell({
@@ -342,36 +346,56 @@ export async function exportDocx(state: DocumentState) {
                   margins: noCellMargins,
                   children: [
                     // Tên cơ quan bên B: font 13pt (size 26), Times New Roman
-                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                      new TextRun({ text: state.partyBUnit, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
-                    ]}),
+                    ...state.partyBUnit.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                        new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
+                      ]})
+                    ),
                     // Chức vụ bên B: font 13pt (size 26), Times New Roman
-                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                      new TextRun({ text: state.partyBPosition, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
-                    ]}),
+                    ...state.partyBPosition.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                        new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
+                      ]})
+                    ),
                   ],
                 }),
               ]}),
               new TableRow({ children: [
-                new TableCell({ borders: noBorder, margins: noCellMargins, children: [emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine()] }),
-                new TableCell({ borders: noBorder, margins: noCellMargins, children: [emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine()] }),
+                new TableCell({
+                  width: { size: 50, type: WidthType.PERCENTAGE },
+                  borders: noBorder,
+                  margins: noCellMargins,
+                  children: [emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine()]
+                }),
+                new TableCell({
+                  width: { size: 50, type: WidthType.PERCENTAGE },
+                  borders: noBorder,
+                  margins: noCellMargins,
+                  children: [emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine()]
+                }),
               ]}),
               new TableRow({ children: [
                 new TableCell({
+                  width: { size: 50, type: WidthType.PERCENTAGE },
                   borders: noBorder,
                   margins: noCellMargins,
                   // Họ và tên bên A: font 13pt (size 26), Times New Roman
-                  children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                    new TextRun({ text: state.partyAName, font: 'Times New Roman', bold: true, size: 26 }),
-                  ]})],
+                  children: state.partyAName.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
+                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                      new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26 }),
+                    ]})
+                  ),
                 }),
                 new TableCell({
+                  width: { size: 50, type: WidthType.PERCENTAGE },
                   borders: noBorder,
                   margins: noCellMargins,
                   // Họ và tên bên B: font 13pt (size 26), Times New Roman
-                  children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                    new TextRun({ text: state.partyBName, font: 'Times New Roman', bold: true, size: 26 }),
-                  ]})],
+                  children: state.partyBName.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
+                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                      new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26 }),
+                    ]})
+                  ),
                 }),
               ]}),
             ],

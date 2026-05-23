@@ -235,30 +235,30 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '8%', marginTop: '1rem', textAlign: 'center' }}>
           <div>
             {/* Tên cơ quan bên A: font 13pt, Times New Roman */}
-            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif' }}>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif', whiteSpace: 'pre-wrap' }}>
               {state.partyAUnit}
             </div>
             {/* Chức vụ bên A: font 13pt, Times New Roman */}
-            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif' }}>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif', whiteSpace: 'pre-wrap' }}>
               {state.partyAPosition}
             </div>
           </div>
           <div>
             {/* Tên cơ quan bên B: font 13pt, Times New Roman */}
-            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif' }}>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif', whiteSpace: 'pre-wrap' }}>
               {state.partyBUnit}
             </div>
             {/* Chức vụ bên B: font 13pt, Times New Roman */}
-            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif' }}>
+            <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2pt', fontFamily: '"Times New Roman", Times, serif', whiteSpace: 'pre-wrap' }}>
               {state.partyBPosition}
             </div>
           </div>
           <div style={{ height: '90px' }} />
           <div style={{ height: '90px' }} />
           {/* Họ và tên bên A: font 13pt, Times New Roman */}
-          <div style={{ fontWeight: 'bold', fontSize: '13pt', fontFamily: '"Times New Roman", Times, serif' }}>{state.partyAName}</div>
+          <div style={{ fontWeight: 'bold', fontSize: '13pt', fontFamily: '"Times New Roman", Times, serif', whiteSpace: 'pre-wrap' }}>{state.partyAName}</div>
           {/* Họ và tên bên B: font 13pt, Times New Roman */}
-          <div style={{ fontWeight: 'bold', fontSize: '13pt', fontFamily: '"Times New Roman", Times, serif' }}>{state.partyBName}</div>
+          <div style={{ fontWeight: 'bold', fontSize: '13pt', fontFamily: '"Times New Roman", Times, serif', whiteSpace: 'pre-wrap' }}>{state.partyBName}</div>
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>

@@ -26,10 +26,10 @@ interface SidebarProps {
 }
 
 const AGENCY_DEFAULTS: Record<string, { suffix: string; location: string }> = {
-  'BẢO HIỂM XÃ HỘI CƠ SỞ CAO LÃNH': { suffix: '/BHXH-CL', location: 'Cao Lãnh' },
-  'BẢO HIỂM XÃ HỘI CƠ SỞ THÁP MƯỜI': { suffix: '/BHXH-TM', location: 'Tháp Mười' },
-  'BẢO HIỂM XÃ HỘI CƠ SỞ TAM NÔNG': { suffix: '/BHXH-TN', location: 'Tam Nông' },
-  'BẢO HIỂM XÃ HỘI CƠ SỞ THANH BÌNH': { suffix: '/BHXH-TB', location: 'Thanh Bình' },
+  'BẢO HIỂM XÃ HỘI CƠ SỞ CAO LÃNH': { suffix: 'BHXH-CL', location: 'Cao Lãnh' },
+  'BẢO HIỂM XÃ HỘI CƠ SỞ THÁP MƯỜI': { suffix: 'BHXH-TM', location: 'Tháp Mười' },
+  'BẢO HIỂM XÃ HỘI CƠ SỞ TAM NÔNG': { suffix: 'BHXH-TN', location: 'Tam Nông' },
+  'BẢO HIỂM XÃ HỘI CƠ SỞ THANH BÌNH': { suffix: 'BHXH-TB', location: 'Thanh Bình' },
 }
 
 const DOC_TYPE_OPTIONS: { value: DocType; label: string }[] = [
@@ -61,7 +61,8 @@ export default function Sidebar({
     if (state.docSymbol || agencies.length === 0) return
     const matched = agencies.find(a => a.main === state.agencyMain)
     const hardcoded = AGENCY_DEFAULTS[state.agencyMain.toUpperCase().trim()]
-    const suffix = matched?.suffix || hardcoded?.suffix
+    const rawSuffix = matched?.suffix || hardcoded?.suffix
+    const suffix = rawSuffix ? rawSuffix.replace(/^\//, '') : ''
     if (suffix) dispatch({ type: 'SET_FIELD', field: 'docSymbol', value: suffix })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agencies])
@@ -82,7 +83,8 @@ export default function Sidebar({
     }
 
     const hardcoded = AGENCY_DEFAULTS[value.toUpperCase().trim()]
-    const suffix = selectedAgency?.suffix || hardcoded?.suffix
+    const rawSuffix = selectedAgency?.suffix || hardcoded?.suffix
+    const suffix = rawSuffix ? rawSuffix.replace(/^\//, '') : ''
     const location = selectedAgency?.location || hardcoded?.location
 
     if (location) dispatch({ type: 'SET_FIELD', field: 'location', value: location })
@@ -121,7 +123,7 @@ export default function Sidebar({
                   <input value={state.docNumber} onChange={set('docNumber')} className={inputCls} placeholder="12" />
                 </Field>
                 <Field label="Ký hiệu" className="flex-1">
-                  <input value={state.docSymbol} onChange={set('docSymbol')} className={inputCls} placeholder="/BHXH-CL" />
+                  <input value={state.docSymbol} onChange={set('docSymbol')} className={inputCls} placeholder="BHXH-CL" />
                 </Field>
               </div>
               <Field label="Địa danh">
