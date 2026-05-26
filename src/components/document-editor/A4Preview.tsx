@@ -17,22 +17,30 @@ const addPunctuation = (line: string): string => {
 
 const stripEndingPunctuation = (line: string): string => line.trim().replace(/[.;:,]+\s*$/, '')
 
-// Mục La Mã I-VII → dấu ":", mục số 1-9 → dấu ".", đoạn văn thường → dấu "."
+const isHeadingLine = (line: string): boolean => {
+  const trimmed = line.trim()
+  const isRoman = /^(IX|VIII|VII|VI|V|IV|III|II|I)(?!\w)([.)\s/\\-]|$)/i.test(trimmed)
+  const isArabic = /^[1-9](?!\d)(?!\.\d)([.)\s/\\-]|$)/.test(trimmed)
+  return isRoman || isArabic
+}
+
+// Mục La Mã I-IX và mục số 1-9 → không có dấu ở cuối câu. Đoạn văn thường → dấu "."
 const normalizeBodyText = (text: string): string => {
   const stripped = stripEndingPunctuation(text)
-  if (/^(VII|VI|IV|III|II|I|V)[.)\s]/i.test(stripped)) return `${stripped}:`
-  if (/^[1-9][.)\s]/.test(stripped)) return `${stripped}.`
+  if (isHeadingLine(text)) {
+    return stripped
+  }
   return `${stripped}.`
 }
 
-// Chuẩn hóa đoạn văn tự do (trích yếu, kết luận, câu đặt vấn đề): luôn kết thúc bằng dấu "."
+// Chuẩn hóa đoạn văn tự do (trích yếu, kết luận, câu đặt vấn đề): nếu là heading thì không dấu ở cuối, ngược lại luôn kết thúc bằng dấu "."
 const normalizeFreeText = (text: string): string => {
   const stripped = stripEndingPunctuation(text)
+  if (isHeadingLine(text)) {
+    return stripped
+  }
   return stripped ? `${stripped}.` : text
 }
-
-const isHeadingLine = (line: string): boolean =>
-  /^(VII|III|VI|IV|II|I|V|\d+)(?!\.\d+\.\d)[.)\s]/i.test(line.trim())
 
 interface A4PreviewProps {
   state: DocumentState
@@ -83,7 +91,9 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
     .filter(Boolean)
 
   const bodyStyle: React.CSSProperties = {
-    marginBottom: '5pt',
+    marginTop: '6pt',
+    marginBottom: '6pt',
+    lineHeight: '18pt',
     textIndent: '1.27cm',
     textAlign: 'justify',
   }
@@ -185,7 +195,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
 
         {/* Câu đặt vấn đề: ngay sát nội dung chính, không có khoảng cách thêm */}
         {state.issueStatement && (
-          <div style={{ ...bodyStyle, marginBottom: '5pt', ...(isHeadingLine(state.issueStatement) ? { fontWeight: 'bold' } : {}) }}>
+          <div style={{ ...bodyStyle, ...(isHeadingLine(state.issueStatement) ? { fontWeight: 'bold' } : {}) }}>
             {renderHighlighted(normalizeFreeText(state.issueStatement), highlightWords, onWordDoubleClick)}
           </div>
         )}
@@ -225,7 +235,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
 
         {/* Kết luận/Yêu cầu: luôn kết thúc bằng dấu "." */}
         {state.conclusion && (
-          <div style={{ ...bodyStyle, marginBottom: '0.5rem', ...(isHeadingLine(state.conclusion) ? { fontWeight: 'bold' } : {}) }}>
+          <div style={{ ...bodyStyle, ...(isHeadingLine(state.conclusion) ? { fontWeight: 'bold' } : {}) }}>
             {renderHighlighted(normalizeFreeText(state.conclusion), highlightWords, onWordDoubleClick)}
           </div>
         )}

@@ -21,17 +21,21 @@ const addPunctuation = (line: string): string => {
 
 const stripEndingPunctuation = (line: string): string => line.trim().replace(/[.;:,]+\s*$/, '')
 
-// Mục La Mã I-VII → dấu ":", mục số 1-9 → dấu ".", đoạn văn thường → dấu "."
+// Mục La Mã I-IX và mục số 1-9 → không có dấu ở cuối câu. Đoạn văn thường → dấu "."
 const normalizeBodyText = (text: string): string => {
   const stripped = stripEndingPunctuation(text)
-  if (/^(VII|VI|IV|III|II|I|V)[.)\s]/i.test(stripped)) return `${stripped}:`
-  if (/^[1-9][.)\s]/.test(stripped)) return `${stripped}.`
+  if (isHeadingLine(text)) {
+    return stripped
+  }
   return `${stripped}.`
 }
 
-// Chuẩn hóa đoạn văn tự do (trích yếu, nội dung chính, kết luận): luôn kết thúc bằng dấu "."
+// Chuẩn hóa đoạn văn tự do (trích yếu, nội dung chính, kết luận): nếu là heading thì không dấu ở cuối, ngược lại luôn kết thúc bằng dấu "."
 const normalizeFreeText = (text: string): string => {
   const stripped = stripEndingPunctuation(text)
+  if (isHeadingLine(text)) {
+    return stripped
+  }
   return stripped ? `${stripped}.` : text
 }
 
@@ -65,7 +69,10 @@ function removeVietnameseDiacritics(str: string): string {
 }
 
 function isHeadingLine(line: string): boolean {
-  return /^(VII|III|VI|IV|II|I|V|\d+)(?!\.\d+\.\d)[.)\s]/i.test(line.trim())
+  const trimmed = line.trim()
+  const isRoman = /^(IX|VIII|VII|VI|V|IV|III|II|I)(?!\w)([.)\s/\\-]|$)/i.test(trimmed)
+  const isArabic = /^[1-9](?!\d)(?!\.\d)([.)\s/\\-]|$)/.test(trimmed)
+  return isRoman || isArabic
 }
 
 function createBodyParagraph(text: string, bold = false, fontSize = 28, isFreeText = false) {
@@ -74,7 +81,7 @@ function createBodyParagraph(text: string, bold = false, fontSize = 28, isFreeTe
     alignment: AlignmentType.BOTH,
     contextualSpacing: true,
     indent: { firstLine: cmToTwip(1.27), left: 0 },
-    spacing: { before: 0, after: 120, line: 300, lineRule: LineRuleType.EXACTLY },
+    spacing: { before: 120, after: 120, line: 360, lineRule: LineRuleType.EXACTLY },
     children: [new TextRun({ text: normalizedText, font: 'Times New Roman', size: fontSize, bold })],
   })
 }
@@ -85,7 +92,7 @@ function createLegalBasisParagraph(text: string, fontSize = 28) {
     alignment: AlignmentType.BOTH,
     contextualSpacing: true,
     indent: { firstLine: cmToTwip(1.27), left: 0 },
-    spacing: { before: 0, after: 120, line: 300, lineRule: LineRuleType.EXACTLY },
+    spacing: { before: 120, after: 120, line: 360, lineRule: LineRuleType.EXACTLY },
     children: [new TextRun({ text, font: 'Times New Roman', size: fontSize, bold: false })],
   })
 }
