@@ -41,7 +41,7 @@ const PART_STARTERS: Record<number, TransitionPhrase[]> = {
 const PROVIDERS: { value: Provider; label: string; placeholder: string; storageKey: string; color: string }[] = [
   { value: 'gemini', label: 'Gemini', placeholder: 'Sử dụng key trả phí của hệ thống hoặc nhập key riêng...', storageKey: 'ai-gemini-key', color: '#3b82f6' },
   { value: 'deepseek', label: 'DeepSeek', placeholder: 'Nhập sk-...', storageKey: 'ai-deepseek-key', color: '#6366f1' },
-  { value: 'anthropic', label: 'AI miễn phí', placeholder: 'Không cần cấu hình (Sử dụng miễn phí)...', storageKey: 'ai-anthropic-key', color: '#c97d4e' },
+  { value: 'anthropic', label: 'AI miễn phí', placeholder: 'Nhập API Key Gemini Free (Model: gemini-2.5-flash-lite)...', storageKey: 'ai-anthropic-key', color: '#c97d4e' },
 ]
 
 export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssistantProps) {
@@ -78,14 +78,25 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
   const [analyzerError, setAnalyzerError] = useState('')
   const [analyzerResult, setAnalyzerResult] = useState<Record<string, string> | null>(null)
 
+  // States cho API key editing & saving UI
+  const [isEditingKey, setIsEditingKey] = useState<Record<Provider, boolean>>({
+    gemini: false,
+    deepseek: false,
+    anthropic: false
+  })
+
   // Tải API keys từ Local Storage
   useEffect(() => {
     const loaded: Record<Provider, string> = { gemini: '', deepseek: '', anthropic: '' }
+    const editing: Record<Provider, boolean> = { gemini: false, deepseek: false, anthropic: false }
     PROVIDERS.forEach(p => {
-      loaded[p.value] = localStorage.getItem(p.storageKey) || ''
+      const saved = localStorage.getItem(p.storageKey) || ''
+      loaded[p.value] = saved
+      editing[p.value] = !saved // If key is empty, show input by default
     })
     setTimeout(() => {
       setApiKeys(loaded)
+      setIsEditingKey(editing)
     }, 0)
   }, [])
 
@@ -417,20 +428,52 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
           ))}
         </div>
         <div>
-          {provider !== 'anthropic' && (
-            <input
-              type="password"
-              value={apiKeys[provider]}
-              onChange={e => handleKeyChange(e.target.value)}
-              placeholder={PROVIDERS.find(p => p.value === provider)!.placeholder}
-              className={`${inputCls} font-mono text-[10px] py-1.5`}
-            />
-          )}
-          {provider === 'gemini' && !apiKeys.gemini && (
-            <div className="text-[9px] text-[#059669] font-medium mt-1">✓ Đã kích hoạt key hệ thống trả phí của máy chủ. Bạn có thể sử dụng trực tiếp không cần cấu hình.</div>
-          )}
-          {provider === 'anthropic' && (
-            <div className="text-[9px] text-[#059669] font-medium mt-1">✓ Đã kích hoạt API Gemini 2.5 Flash Lite Free hệ thống. Không cần nhập key.</div>
+          {!isEditingKey[provider] && apiKeys[provider] ? (
+            <div className="flex items-center justify-between text-[11px] bg-slate-50 p-2 rounded-md border border-slate-100 mt-1 font-sans">
+              <span className="text-[#059669] font-semibold flex items-center gap-1">
+                🔒 Đã lưu API Key ({provider === 'anthropic' ? 'Gemini Free' : provider === 'gemini' ? 'Gemini Paid' : 'DeepSeek'})
+              </span>
+              <button
+                onClick={() => setIsEditingKey(prev => ({ ...prev, [provider]: true }))}
+                className="text-[10px] text-[#1a56b0] hover:underline font-bold"
+              >
+                ✏️ Thay đổi
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2 mt-1">
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={apiKeys[provider]}
+                  onChange={e => {
+                    const val = e.target.value
+                    setApiKeys(prev => ({ ...prev, [provider]: val }))
+                  }}
+                  placeholder={PROVIDERS.find(p => p.value === provider)!.placeholder}
+                  className={`${inputCls} font-mono text-[10px] py-1.5 flex-1`}
+                />
+                <button
+                  onClick={() => {
+                    const val = apiKeys[provider].trim()
+                    const p = PROVIDERS.find(x => x.value === provider)
+                    if (p) {
+                      localStorage.setItem(p.storageKey, val)
+                    }
+                    setIsEditingKey(prev => ({ ...prev, [provider]: false }))
+                  }}
+                  className="bg-[#10b981] hover:bg-[#059669] text-white font-bold text-[11px] px-3 py-1.5 rounded-md transition-colors"
+                >
+                  Lưu
+                </button>
+              </div>
+              {provider === 'gemini' && !apiKeys.gemini && (
+                <div className="text-[9px] text-[#059669] font-medium">✓ Đã kích hoạt key hệ thống trả phí của máy chủ. Bạn có thể sử dụng trực tiếp không cần cấu hình.</div>
+              )}
+              {provider === 'anthropic' && !apiKeys.anthropic && (
+                <div className="text-[9px] text-[#059669] font-medium">✓ Đã kích hoạt API Gemini 2.5 Flash Lite Free hệ thống. Không cần nhập key.</div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -597,7 +640,7 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
                   </button>
                 </div>
               </div>
-              <div className="p-3 text-[11px] text-[#374151] whitespace-pre-wrap max-h-60 overflow-y-auto leading-relaxed font-serif">
+              <div className="p-3 text-xs text-[#374151] whitespace-pre-wrap max-h-60 overflow-y-auto leading-relaxed" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                 {transformResult}
               </div>
             </div>
@@ -859,24 +902,24 @@ Ví dụ: Gợi ý viết nội dung file đính kèm theo Chủ đề: 'Phát h
                 {/* Trích yếu */}
                 {analyzerResult.docSummary && (
                   <div className="pt-2">
-                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Trích yếu nội dung</span>
-                    <span className="text-xs font-bold text-[#374151] leading-relaxed block">{analyzerResult.docSummary}</span>
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1 font-sans">Trích yếu nội dung</span>
+                    <span className="text-xs font-bold text-[#374151] leading-relaxed block" style={{ fontFamily: '"Times New Roman", Times, serif' }}>{analyzerResult.docSummary}</span>
                   </div>
                 )}
                 
                 {/* Kính gửi */}
                 {analyzerResult.recipient && (
                   <div className="pt-2">
-                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Kính gửi</span>
-                    <span className="text-xs text-[#374151] block font-medium">{analyzerResult.recipient}</span>
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1 font-sans">Kính gửi</span>
+                    <span className="text-xs text-[#374151] block font-medium" style={{ fontFamily: '"Times New Roman", Times, serif' }}>{analyzerResult.recipient}</span>
                   </div>
                 )}
                 
                 {/* Căn cứ */}
                 {analyzerResult.legalBasis && (
                   <div className="pt-2">
-                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Căn cứ pháp lý</span>
-                    <p className="text-xs text-[#475569] leading-relaxed whitespace-pre-wrap font-serif bg-slate-50 p-2 rounded border border-slate-100">
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1 font-sans">Căn cứ pháp lý</span>
+                    <p className="text-xs text-[#475569] leading-relaxed whitespace-pre-wrap bg-slate-50 p-2 rounded border border-slate-100" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                       {analyzerResult.legalBasis}
                     </p>
                   </div>
@@ -885,8 +928,8 @@ Ví dụ: Gợi ý viết nội dung file đính kèm theo Chủ đề: 'Phát h
                 {/* Đặt vấn đề */}
                 {analyzerResult.issueStatement && (
                   <div className="pt-2">
-                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Câu đặt vấn đề</span>
-                    <p className="text-xs text-[#475569] leading-relaxed whitespace-pre-wrap font-serif bg-slate-50 p-2 rounded border border-slate-100">
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1 font-sans">Câu đặt vấn đề</span>
+                    <p className="text-xs text-[#475569] leading-relaxed whitespace-pre-wrap bg-slate-50 p-2 rounded border border-slate-100" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                       {analyzerResult.issueStatement}
                     </p>
                   </div>
@@ -895,7 +938,7 @@ Ví dụ: Gợi ý viết nội dung file đính kèm theo Chủ đề: 'Phát h
                 {/* Nội dung chính */}
                 {analyzerResult.mainContent && (
                   <div className="pt-2">
-                    <div className="flex justify-between items-center mb-1">
+                    <div className="flex justify-between items-center mb-1 font-sans">
                       <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold">Nội dung chính</span>
                       <button
                         onClick={() => navigator.clipboard.writeText(analyzerResult.mainContent)}
@@ -904,7 +947,7 @@ Ví dụ: Gợi ý viết nội dung file đính kèm theo Chủ đề: 'Phát h
                         📋 Copy nội dung
                       </button>
                     </div>
-                    <p className="text-xs text-[#1e293b] leading-relaxed whitespace-pre-wrap font-serif bg-slate-50 p-2 rounded border border-slate-100 max-h-48 overflow-y-auto">
+                    <p className="text-xs text-[#1e293b] leading-relaxed whitespace-pre-wrap bg-slate-50 p-2 rounded border border-slate-100 max-h-48 overflow-y-auto" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                       {analyzerResult.mainContent}
                     </p>
                   </div>
@@ -913,8 +956,8 @@ Ví dụ: Gợi ý viết nội dung file đính kèm theo Chủ đề: 'Phát h
                 {/* Kết luận */}
                 {analyzerResult.conclusion && (
                   <div className="pt-2">
-                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Kết luận / Yêu cầu</span>
-                    <p className="text-xs text-[#475569] leading-relaxed whitespace-pre-wrap font-serif bg-slate-50 p-2 rounded border border-slate-100">
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1 font-sans">Kết luận / Yêu cầu</span>
+                    <p className="text-xs text-[#475569] leading-relaxed whitespace-pre-wrap bg-slate-50 p-2 rounded border border-slate-100" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                       {analyzerResult.conclusion}
                     </p>
                   </div>
@@ -923,8 +966,8 @@ Ví dụ: Gợi ý viết nội dung file đính kèm theo Chủ đề: 'Phát h
                 {/* Nơi nhận */}
                 {analyzerResult.recipientsCc && (
                   <div className="pt-2">
-                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Nơi nhận</span>
-                    <p className="text-[11px] text-[#475569] leading-relaxed whitespace-pre-wrap bg-slate-50 p-2 rounded border border-slate-100">
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1 font-sans">Nơi nhận</span>
+                    <p className="text-xs text-[#475569] leading-relaxed whitespace-pre-wrap bg-slate-50 p-2 rounded border border-slate-100" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                       {analyzerResult.recipientsCc}
                     </p>
                   </div>

@@ -169,7 +169,7 @@ export async function POST(request: Request) {
     } else if (provider === 'anthropic') {
       // Nút AI miễn phí (sử dụng Gemini Free)
       selectedProvider = 'gemini'
-      apiKey = process.env.GEMINI_FREE_API_KEY || process.env.GEMINI_API_KEY
+      apiKey = customApiKey || process.env.GEMINI_FREE_API_KEY || process.env.GEMINI_API_KEY
       model = process.env.GEMINI_FREE_MODEL || 'gemini-2.5-flash-lite'
       if (!apiKey) {
         return NextResponse.json({ error: 'Thiếu API Key cho AI miễn phí' }, { status: 400 })
