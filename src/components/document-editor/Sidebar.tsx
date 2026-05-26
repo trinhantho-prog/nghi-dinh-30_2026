@@ -146,6 +146,9 @@ export default function Sidebar({
               ))}
             </select>
           </Field>
+          <Field label="Thư mục (Folder)">
+            <input value={state.folder || ''} onChange={set('folder')} className={inputCls} placeholder="Ví dụ: Báo cáo năm 2026..." />
+          </Field>
           <Field label="Trích yếu nội dung">
             <textarea value={state.docSummary} onChange={set('docSummary')} rows={2} className={`${inputCls} resize-y`} />
           </Field>
@@ -300,7 +303,7 @@ export default function Sidebar({
         <button onClick={onExportDocx} className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-sm font-semibold bg-[#10b981] text-white hover:bg-[#059669] transition-colors">
           📥 Xuất DOCX
         </button>
-        <div className="text-center text-xs text-[#6b7597]">{documentCount}/99 văn bản</div>
+        <div className="text-center text-xs text-[#6b7597]">{documentCount}/1000 văn bản</div>
       </footer>
     </aside>
   )

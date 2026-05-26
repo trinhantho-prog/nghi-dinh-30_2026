@@ -36,6 +36,7 @@ export interface DocumentState {
   partyBUnit: string
   partyBPosition: string
   partyBName: string
+  folder?: string
 }
 
 export const DEFAULT_DOCUMENT_STATE: DocumentState = {
@@ -61,6 +62,7 @@ export const DEFAULT_DOCUMENT_STATE: DocumentState = {
   partyBUnit: '',
   partyBPosition: '',
   partyBName: '',
+  folder: '',
 }
 
 export interface Tenant {

@@ -79,7 +79,7 @@ export default function SettingsClient({ tenantId, tenantName, isAdmin, agencies
           <h2 className="text-sm font-bold text-[#7b8abf] uppercase tracking-wide mb-3">Thống kê sử dụng</h2>
           <div className="flex gap-6">
             <div>
-              <div className="text-2xl font-bold text-[#1a56b0]">{documentCount}<span className="text-base font-normal text-[#6b7597]">/99</span></div>
+              <div className="text-2xl font-bold text-[#1a56b0]">{documentCount}<span className="text-base font-normal text-[#6b7597]">/1000</span></div>
               <div className="text-xs text-[#6b7597]">Văn bản</div>
             </div>
             <div>

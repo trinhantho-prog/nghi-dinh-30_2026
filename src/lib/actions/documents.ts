@@ -42,7 +42,7 @@ export async function saveDocument(
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
 
-      if ((count ?? 0) >= 99) throw new Error('Đã đạt giới hạn 99 văn bản')
+      if ((count ?? 0) >= 1000) throw new Error('Đã đạt giới hạn 1000 văn bản')
 
       const { data } = await supabase
         .from('documents')
@@ -113,7 +113,7 @@ export async function getDocuments() {
   const [{ data: docs, count }, { data: config }] = await Promise.all([
     supabase
       .from('documents')
-      .select('id, title, doc_type, updated_at, created_at', { count: 'exact' })
+      .select('id, title, doc_type, updated_at, created_at, content', { count: 'exact' })
       .eq('tenant_id', tenantId)
       .order('updated_at', { ascending: false }),
     supabase
