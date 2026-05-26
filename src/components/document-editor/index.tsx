@@ -129,7 +129,10 @@ QUY TẮC PHẠM VI ĐẦU RA PHẢN HỒI (RẤT QUAN TRỌNG):
 1. Nếu yêu cầu chỉnh sửa chỉ nhắm vào một mục cụ thể, một đoạn cụ thể, hoặc yêu cầu viết chi tiết/viết thêm/sửa đổi một phần riêng biệt (ví dụ: "viết chi tiết hơn ở riêng mục V", "sửa đoạn 2", "viết thêm mục căn cứ"...): Bạn CHỈ ĐƯỢC PHÉP trả về đúng nội dung chi tiết của riêng phần/mục/đoạn được yêu cầu đó sau khi đã được nâng cấp, gọt giũa và sửa lỗi chính tả theo văn phong hành chính. TUYỆT ĐỐI KHÔNG trả lại toàn bộ văn bản gốc hay sao chép lại các mục khác không liên quan.
 2. Nếu yêu cầu chỉnh sửa mang tính tổng thể cho toàn bộ văn bản (ví dụ: "sửa lỗi chính tả cả văn bản", "chuyển cả bài sang văn phong công văn"): Bạn mới được trả lại toàn bộ văn bản đã xử lý.
 
-Đầu ra viết bằng văn phong công vụ, hành chính, nghiêm túc, chặt chẽ của cơ quan Nhà nước Việt Nam. Kết quả đầu ra CHỈ chứa nội dung văn bản hành chính mới đã được xử lý xong theo đúng phạm vi nêu trên, KHÔNG chứa bất kỳ lời dẫn giải thích, lời chào hay định dạng markdown bổ sung bên ngoài nào khác.`
+QUY TẮC ĐỊNH DẠNG ĐẦU RA (BẮT BUỘC):
+Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc các biện pháp thực hiện dưới mục/đoạn văn: Bạn BẮT BUỘC phải bắt đầu mỗi ý bằng dấu gạch đầu dòng dạng "- " (ví dụ: "- Thường xuyên tu dưỡng...\\n- Chủ động rà soát..."). TUYỆT ĐỐI KHÔNG bắt đầu bằng số thứ tự 1, 2, 3, 4, 5... để liệt kê các ý này trừ khi người dùng có yêu cầu chỉ đích danh việc đánh số.
+
+Đầu ra viết bằng văn phong công vụ, hành chính, nghiêm túc, chặt chẽ của cơ quan Nhà nước Việt Nam. Kết quả đầu ra CHỈ chứa nội dung văn bản hành chính mới đã được xử lý xong theo đúng phạm vi và định dạng nêu trên, KHÔNG chứa bất kỳ lời dẫn giải thích, lời chào hay định dạng markdown bổ sung bên ngoài nào khác.`
 
       const res = await fetch('/api/ai/suggest', {
         method: 'POST',
