@@ -125,9 +125,9 @@ async function callGemini(apiKey: string, model: string, prompt: string): Promis
       const err = await res.json()
       const errMsg = err.error?.message || ''
       
-      if ((res.status === 429 || res.status === 503 || errMsg.toLowerCase().includes('demand') || errMsg.toLowerCase().includes('exhausted')) && model !== 'gemini-1.5-flash') {
-        console.warn(`[Gemini Fallback] Model ${model} gặp lỗi quá tải. Tự động chuyển đổi sang gemini-1.5-flash...`)
-        return callGemini(apiKey, 'gemini-1.5-flash', prompt)
+      if ((res.status === 429 || res.status === 503 || errMsg.toLowerCase().includes('demand') || errMsg.toLowerCase().includes('exhausted')) && model !== 'gemini-2.0-flash-lite') {
+        console.warn(`[Gemini Fallback] Model ${model} gặp lỗi quá tải. Tự động chuyển đổi sang gemini-2.0-flash-lite...`)
+        return callGemini(apiKey, 'gemini-2.0-flash-lite', prompt)
       }
       
       throw new Error(errMsg || `Lỗi Gemini API: ${res.status}`)
@@ -136,9 +136,9 @@ async function callGemini(apiKey: string, model: string, prompt: string): Promis
     return data.candidates[0].content.parts[0].text as string
   } catch (error: any) {
     const msg = error.message || ''
-    if ((msg.toLowerCase().includes('demand') || msg.toLowerCase().includes('exhausted') || msg.toLowerCase().includes('fetch')) && model !== 'gemini-1.5-flash') {
-      console.warn(`[Gemini Fallback] Model ${model} gặp lỗi. Tự động chuyển đổi sang gemini-1.5-flash...`)
-      return callGemini(apiKey, 'gemini-1.5-flash', prompt)
+    if ((msg.toLowerCase().includes('demand') || msg.toLowerCase().includes('exhausted') || msg.toLowerCase().includes('fetch')) && model !== 'gemini-2.0-flash-lite') {
+      console.warn(`[Gemini Fallback] Model ${model} gặp lỗi. Tự động chuyển đổi sang gemini-2.0-flash-lite...`)
+      return callGemini(apiKey, 'gemini-2.0-flash-lite', prompt)
     }
     throw error;
   }

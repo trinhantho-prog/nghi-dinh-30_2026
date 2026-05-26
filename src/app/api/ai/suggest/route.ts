@@ -117,10 +117,10 @@ async function callGemini(apiKey: string, model: string, systemPrompt: string, u
       const err = await res.json()
       const errMsg = err.error?.message || ''
       
-      // Nếu gặp lỗi quá tải/độ trễ cao và model đang dùng không phải gemini-1.5-flash, tự động fallback sang gemini-1.5-flash
-      if ((res.status === 429 || res.status === 503 || errMsg.toLowerCase().includes('demand') || errMsg.toLowerCase().includes('exhausted')) && model !== 'gemini-1.5-flash') {
-        console.warn(`[Gemini Fallback] Model ${model} gặp lỗi quá tải. Tự động chuyển đổi sang gemini-1.5-flash...`)
-        return callGemini(apiKey, 'gemini-1.5-flash', systemPrompt, userMessage)
+      // Nếu gặp lỗi quá tải/độ trễ cao và model đang dùng không phải gemini-2.0-flash-lite, tự động fallback sang gemini-2.0-flash-lite
+      if ((res.status === 429 || res.status === 503 || errMsg.toLowerCase().includes('demand') || errMsg.toLowerCase().includes('exhausted')) && model !== 'gemini-2.0-flash-lite') {
+        console.warn(`[Gemini Fallback] Model ${model} gặp lỗi quá tải. Tự động chuyển đổi sang gemini-2.0-flash-lite...`)
+        return callGemini(apiKey, 'gemini-2.0-flash-lite', systemPrompt, userMessage)
       }
       
       throw new Error(errMsg || `Lỗi Gemini API: ${res.status}`)
@@ -129,9 +129,9 @@ async function callGemini(apiKey: string, model: string, systemPrompt: string, u
     return data.candidates[0].content.parts[0].text as string
   } catch (error: any) {
     const msg = error.message || ''
-    if ((msg.toLowerCase().includes('demand') || msg.toLowerCase().includes('exhausted') || msg.toLowerCase().includes('fetch')) && model !== 'gemini-1.5-flash') {
-      console.warn(`[Gemini Fallback] Model ${model} gặp lỗi. Tự động chuyển đổi sang gemini-1.5-flash...`)
-      return callGemini(apiKey, 'gemini-1.5-flash', systemPrompt, userMessage)
+    if ((msg.toLowerCase().includes('demand') || msg.toLowerCase().includes('exhausted') || msg.toLowerCase().includes('fetch')) && model !== 'gemini-2.0-flash-lite') {
+      console.warn(`[Gemini Fallback] Model ${model} gặp lỗi. Tự động chuyển đổi sang gemini-2.0-flash-lite...`)
+      return callGemini(apiKey, 'gemini-2.0-flash-lite', systemPrompt, userMessage)
     }
     throw error;
   }
