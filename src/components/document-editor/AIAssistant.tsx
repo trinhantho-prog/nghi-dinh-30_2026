@@ -9,39 +9,13 @@ interface AIAssistantProps {
   onIssuesChange?: (issues: AIIssue[]) => void
 }
 
-type Tab = 'linter' | 'transformer' | 'structure' | 'analyzer'
+type Tab = 'linter' | 'transformer' | 'analyzer'
 type Provider = 'gemini' | 'deepseek' | 'anthropic'
-
-interface TransitionPhrase {
-  text: string
-  desc: string
-}
-
-const PART_STARTERS: Record<number, TransitionPhrase[]> = {
-  1: [
-    { text: 'Căn cứ vào Nghị định số 30/2020/NĐ-CP của Chính phủ về công tác văn thư...', desc: 'Căn cứ pháp lý tiêu chuẩn' },
-    { text: 'Thực hiện ý kiến chỉ đạo của Lãnh đạo đơn vị về việc triển khai...', desc: 'Thực hiện chỉ đạo cấp trên' },
-    { text: 'Trước tình hình thực tế triển khai nhiệm vụ chuyên môn tại địa bàn...', desc: 'Đánh giá bối cảnh thực tế' },
-    { text: 'Nhằm đáp ứng yêu cầu nâng cao hiệu quả công tác quản lý nhà nước...', desc: 'Mục đích nâng cao quản lý' },
-  ],
-  2: [
-    { text: 'Về kết quả đạt được, trong thời gian qua, đơn vị đã tập trung...', desc: 'Liệt kê kết quả nổi bật' },
-    { text: 'Cơ bản hoàn thành các chỉ tiêu được giao theo đúng tiến độ, cụ thể...', desc: 'Báo cáo chỉ tiêu đạt được' },
-    { text: 'Bên cạnh những kết quả đạt được, công tác vẫn còn một số hạn chế, tồn tại...', desc: 'Nhập đề chỉ ra hạn chế' },
-    { text: 'Do một số nguyên nhân khách quan và chủ quan, tiến độ thực hiện...', desc: 'Giải trình nguyên nhân khó khăn' },
-  ],
-  3: [
-    { text: 'Nhằm phát huy kết quả đã đạt được, trong thời gian tới, đơn vị tập trung...', desc: 'Phương hướng phát triển' },
-    { text: 'Để khắc phục những vướng mắc, hạn chế nêu trên, đơn vị đề xuất phương án...', desc: 'Đề xuất giải quyết khó khăn' },
-    { text: 'Kính trình Lãnh đạo cấp trên xem xét, cho ý kiến chỉ đạo đối với...', desc: 'Kính trình xin ý kiến' },
-    { text: 'Kiến nghị các cơ quan ban ngành liên quan chủ động phối hợp chặt chẽ...', desc: 'Kiến nghị phối hợp liên ngành' },
-  ],
-}
 
 const PROVIDERS: { value: Provider; label: string; placeholder: string; storageKey: string; color: string }[] = [
   { value: 'gemini', label: 'Gemini', placeholder: 'Sử dụng key trả phí của hệ thống hoặc nhập key riêng...', storageKey: 'ai-gemini-key', color: '#3b82f6' },
   { value: 'deepseek', label: 'DeepSeek', placeholder: 'Nhập sk-...', storageKey: 'ai-deepseek-key', color: '#6366f1' },
-  { value: 'anthropic', label: 'AI miễn phí', placeholder: 'Nhập API Key Gemini Free (Model: gemini-2.5-flash-lite)...', storageKey: 'ai-anthropic-key', color: '#c97d4e' },
+  { value: 'anthropic', label: 'AI miễn phí', placeholder: 'Nhập API Key Gemini Free (Model: gemini-2.0-flash-lite)...', storageKey: 'ai-anthropic-key', color: '#c97d4e' },
 ]
 
 export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssistantProps) {
@@ -61,13 +35,6 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
   const [transformResult, setTransformResult] = useState('')
   const [transformError, setTransformError] = useState('')
 
-  // States cho Cấu trúc 3 phần
-  const [activePart, setActivePart] = useState<number>(1)
-  const [structurePrompt, setStructurePrompt] = useState('')
-  const [structureLoading, setStructureLoading] = useState(false)
-  const [structureResult, setStructureResult] = useState('')
-  const [structureError, setStructureError] = useState('')
-
   // States cho Phân tích tài liệu & Tạo mới
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
   const [extractedText, setExtractedText] = useState<string>('')
@@ -79,33 +46,31 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
   const [analyzerResult, setAnalyzerResult] = useState<Record<string, string> | null>(null)
 
   // States cho API key editing & saving UI
-  const [isEditingKey, setIsEditingKey] = useState<Record<Provider, boolean>>({
-    gemini: false,
-    deepseek: false,
-    anthropic: false
-  })
+  const [isEditingKeys, setIsEditingKeys] = useState(false)
 
   // Tải API keys từ Local Storage
   useEffect(() => {
     const loaded: Record<Provider, string> = { gemini: '', deepseek: '', anthropic: '' }
-    const editing: Record<Provider, boolean> = { gemini: false, deepseek: false, anthropic: false }
+    let hasAnyKey = false
     PROVIDERS.forEach(p => {
       const saved = localStorage.getItem(p.storageKey) || ''
       loaded[p.value] = saved
-      editing[p.value] = !saved // If key is empty, show input by default
+      if (saved) hasAnyKey = true
     })
     setTimeout(() => {
       setApiKeys(loaded)
-      setIsEditingKey(editing)
+      setIsEditingKeys(!hasAnyKey) // If no keys saved at all, open inputs by default
     }, 0)
+
+    const savedProvider = localStorage.getItem('ai-active-provider') as Provider
+    if (savedProvider && PROVIDERS.some(p => p.value === savedProvider)) {
+      setProvider(savedProvider)
+    }
   }, [])
 
-  const handleKeyChange = (val: string) => {
-    const updated = { ...apiKeys, [provider]: val }
-    setApiKeys(updated)
-    const p = PROVIDERS.find(x => x.value === provider)
-    if (p) localStorage.setItem(p.storageKey, val.trim())
-  }
+  useEffect(() => {
+    localStorage.setItem('ai-active-provider', provider)
+  }, [provider])
 
   // === 1. BỘ QUÉT THỂ THỨC (LINTER) ===
   const runLinter = async () => {
@@ -259,38 +224,7 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
     }
   }
 
-  // === 3. CẤU TRÚC BÁO CÁO 3 PHẦN ===
-  const generateStructureDraft = async (starterText: string) => {
-    setStructureLoading(true)
-    setStructureError('')
-    setStructureResult('')
-    try {
-      const userPrompt = `Hãy viết một đoạn văn hành chính bắt đầu chính xác bằng cụm từ: "${starterText}".\nNội dung cần viết dựa trên các ý thô sau: ${structurePrompt || 'Triển khai chi tiết chuyên nghiệp phần nội dung hành chính công vụ.'}`
-      
-      const res = await fetch('/api/ai/suggest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey: apiKeys[provider]?.trim() || undefined,
-          prompt: userPrompt,
-          provider: provider,
-          mode: 'structure'
-        }),
-      })
 
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Có lỗi khi tạo văn bản theo cấu trúc')
-      }
-
-      const data = await res.json()
-      setStructureResult(data.suggestion)
-    } catch (e: unknown) {
-      setStructureError(e instanceof Error ? e.message : 'Có lỗi không xác định')
-    } finally {
-      setStructureLoading(false)
-    }
-  }
 
   const handleApplyText = (text: string, append = false) => {
     if (append) {
@@ -428,51 +362,106 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
           ))}
         </div>
         <div>
-          {!isEditingKey[provider] && apiKeys[provider] ? (
-            <div className="flex items-center justify-between text-[11px] bg-slate-50 p-2 rounded-md border border-slate-100 mt-1 font-sans">
-              <span className="text-[#059669] font-semibold flex items-center gap-1">
-                🔒 Đã lưu API Key ({provider === 'anthropic' ? 'Gemini Free' : provider === 'gemini' ? 'Gemini Paid' : 'DeepSeek'})
-              </span>
-              <button
-                onClick={() => setIsEditingKey(prev => ({ ...prev, [provider]: true }))}
-                className="text-[10px] text-[#1a56b0] hover:underline font-bold"
-              >
-                ✏️ Thay đổi
-              </button>
+          {!isEditingKeys ? (
+            <div className="space-y-2 mt-1">
+              <div className="space-y-1.5 text-[11px] bg-slate-50 p-2.5 rounded-md border border-slate-100 font-sans">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#374151] font-semibold">🔑 Cấu hình API Keys:</span>
+                  <button
+                    onClick={() => setIsEditingKeys(true)}
+                    className="text-[10px] text-[#1a56b0] hover:underline font-bold"
+                  >
+                    ✏️ Thay đổi cấu hình
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-1 text-[10px] mt-1.5 border-t border-slate-100 pt-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span className="font-semibold text-slate-600">Gemini:</span>
+                    <span className={apiKeys.gemini ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
+                      {apiKeys.gemini ? "🔒 Đã lưu Key riêng" : "⚡ Sử dụng key hệ thống"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                    <span className="font-semibold text-slate-600">DeepSeek:</span>
+                    <span className={apiKeys.deepseek ? "text-green-600 font-medium" : "text-rose-600 font-medium"}>
+                      {apiKeys.deepseek ? "🔒 Đã lưu Key riêng" : "❌ Chưa cấu hình key riêng"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#c97d4e]" />
+                    <span className="font-semibold text-slate-600">Gemini Free:</span>
+                    <span className={apiKeys.anthropic ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
+                      {apiKeys.anthropic ? "🔒 Đã lưu Key riêng" : "⚡ Sử dụng key hệ thống (Free)"}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="space-y-2 mt-1">
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={apiKeys[provider]}
-                  onChange={e => {
-                    const val = e.target.value
-                    setApiKeys(prev => ({ ...prev, [provider]: val }))
-                  }}
-                  placeholder={PROVIDERS.find(p => p.value === provider)!.placeholder}
-                  className={`${inputCls} font-mono text-[10px] py-1.5 flex-1`}
-                />
-                <button
-                  onClick={() => {
-                    const val = apiKeys[provider].trim()
-                    const p = PROVIDERS.find(x => x.value === provider)
-                    if (p) {
-                      localStorage.setItem(p.storageKey, val)
-                    }
-                    setIsEditingKey(prev => ({ ...prev, [provider]: false }))
-                  }}
-                  className="bg-[#10b981] hover:bg-[#059669] text-white font-bold text-[11px] px-3 py-1.5 rounded-md transition-colors"
-                >
-                  Lưu
-                </button>
+            <div className="space-y-3 mt-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+              <div className="text-[10px] font-bold text-[#475569] uppercase tracking-wide">Nhập API Key riêng (tùy chọn)</div>
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-[9px] font-semibold text-[#475569] mb-1">
+                    1. Gemini Key (Trả phí):
+                  </label>
+                  <input
+                    type="password"
+                    value={apiKeys.gemini}
+                    onChange={e => {
+                      const val = e.target.value
+                      setApiKeys(prev => ({ ...prev, gemini: val }))
+                    }}
+                    placeholder="Sử dụng key trả phí của hệ thống hoặc nhập key riêng..."
+                    className={`${inputCls} font-mono text-[10px] py-1.5`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-semibold text-[#475569] mb-1">
+                    2. DeepSeek Key:
+                  </label>
+                  <input
+                    type="password"
+                    value={apiKeys.deepseek}
+                    onChange={e => {
+                      const val = e.target.value
+                      setApiKeys(prev => ({ ...prev, deepseek: val }))
+                    }}
+                    placeholder="Nhập sk-..."
+                    className={`${inputCls} font-mono text-[10px] py-1.5`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-semibold text-[#475569] mb-1">
+                    3. Gemini Free API Key (Model: gemini-2.0-flash-lite):
+                  </label>
+                  <input
+                    type="password"
+                    value={apiKeys.anthropic}
+                    onChange={e => {
+                      const val = e.target.value
+                      setApiKeys(prev => ({ ...prev, anthropic: val }))
+                    }}
+                    placeholder="Nhập API Key Gemini Free..."
+                    className={`${inputCls} font-mono text-[10px] py-1.5`}
+                  />
+                </div>
               </div>
-              {provider === 'gemini' && !apiKeys.gemini && (
-                <div className="text-[9px] text-[#059669] font-medium">✓ Đã kích hoạt key hệ thống trả phí của máy chủ. Bạn có thể sử dụng trực tiếp không cần cấu hình.</div>
-              )}
-              {provider === 'anthropic' && !apiKeys.anthropic && (
-                <div className="text-[9px] text-[#059669] font-medium">✓ Đã kích hoạt API Gemini 2.5 Flash Lite Free hệ thống. Không cần nhập key.</div>
-              )}
+
+              <button
+                onClick={() => {
+                  PROVIDERS.forEach(p => {
+                    const val = apiKeys[p.value].trim()
+                    localStorage.setItem(p.storageKey, val)
+                  })
+                  setIsEditingKeys(false)
+                }}
+                className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold text-[11px] py-2 rounded-md transition-colors shadow-sm"
+              >
+                Lưu tất cả cấu hình
+              </button>
             </div>
           )}
         </div>
@@ -495,14 +484,6 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
           }`}
         >
           ✍️ Hành Chính
-        </button>
-        <button
-          onClick={() => setActiveTab('structure')}
-          className={`flex-1 pb-2 text-[10px] font-bold text-center border-b-2 transition-all whitespace-nowrap ${
-            activeTab === 'structure' ? 'border-[#3b52bf] text-[#3b52bf]' : 'border-transparent text-[#6b7597] hover:text-[#475569]'
-          }`}
-        >
-          📊 Báo Cáo
         </button>
         <button
           onClick={() => setActiveTab('analyzer')}
@@ -648,104 +629,7 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
         </div>
       )}
 
-      {/* Tab 3: CẤU TRÚC BÁO CÁO 3 PHẦN */}
-      {activeTab === 'structure' && (
-        <div className="space-y-3.5 animate-fade-in">
-          <div>
-            <label className="block text-[11px] font-semibold text-[#6b7597] mb-1.5">
-              Chọn phần báo cáo bạn muốn viết:
-            </label>
-            <div className="flex gap-1">
-              {[
-                { id: 1, label: '1. Căn cứ/Tình hình' },
-                { id: 2, label: '2. Kết quả/Hạn chế' },
-                { id: 3, label: '3. Nhiệm vụ/Đề xuất' },
-              ].map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    setActivePart(p.id)
-                    setStructureResult('')
-                  }}
-                  className={`flex-1 py-1.5 text-[10px] font-bold rounded border transition-all ${
-                    activePart === p.id
-                      ? 'bg-[#3b52bf] text-white border-[#3b52bf]'
-                      : 'bg-white text-[#6b7597] border-[#dde1ef] hover:bg-slate-50'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
-          {/* Danh sách từ ngữ chuyển đoạn */}
-          <div className="space-y-1.5">
-            <span className="block text-[10px] font-bold text-[#475569] uppercase tracking-wide">
-              💡 Click để chọn cụm từ chuyển đoạn NĐ 30 chuẩn:
-            </span>
-            <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto p-0.5">
-              {PART_STARTERS[activePart].map((phrase, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => generateStructureDraft(phrase.text)}
-                  disabled={structureLoading}
-                  className="text-left p-2 bg-white hover:bg-slate-50 rounded border border-[#dde1ef] hover:border-[#b4c6ef] text-[11px] transition-all flex flex-col gap-0.5 active:scale-[0.99]"
-                >
-                  <span className="text-[#1e293b] text-[11.5px] leading-snug font-normal" style={{ fontFamily: '"Times New Roman", Times, serif' }}>{phrase.text}</span>
-                  <span className="text-[9px] text-[#6b7597] italic" style={{ fontFamily: '"Times New Roman", Times, serif' }}>{phrase.desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Nhập ý thô đi kèm */}
-          <div>
-            <label className="block text-[11px] font-semibold text-[#6b7597] mb-1">
-              Mô tả nhanh ý định của bạn cho đoạn văn (tùy chọn):
-            </label>
-            <textarea
-              value={structurePrompt}
-              onChange={e => setStructurePrompt(e.target.value)}
-              rows={2}
-              placeholder="Ví dụ: báo cáo việc trích nộp đóng BHXH của doanh nghiệp tăng cao 15% so với cùng kỳ..."
-              className={`${inputCls} resize-y text-xs`}
-            />
-            <div className="text-[9px] text-[#9ca3af] mt-0.5">Nếu để trống, AI sẽ tự động tạo cấu trúc mẫu chuẩn mực giúp bạn.</div>
-          </div>
-
-          {structureError && (
-            <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-              {structureError}
-            </div>
-          )}
-
-          {structureResult && (
-            <div className="bg-white rounded-lg border border-[#c3d0f5] shadow-sm overflow-hidden animate-slide-up">
-              <div className="bg-[#f0f4ff] px-3 py-2 flex justify-between items-center border-b border-[#dde4f5] text-[10px] font-bold text-[#3b52bf]">
-                <span>📊 Đoạn văn đã dựng theo cấu trúc</span>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => navigator.clipboard.writeText(structureResult)}
-                    className="text-[10px] bg-indigo-100 text-[#4f46e5] px-2 py-1 rounded font-bold hover:bg-indigo-200 transition-colors"
-                  >
-                    📋 Copy
-                  </button>
-                  <button
-                    onClick={() => handleApplyText(structureResult, true)}
-                    className="text-[10px] bg-[#059669] text-white px-2 py-1 rounded font-bold hover:bg-[#047857] transition-colors"
-                  >
-                    + Ghép vào nội dung chính
-                  </button>
-                </div>
-              </div>
-              <div className="p-3 text-[11px] text-[#374151] whitespace-pre-wrap max-h-52 overflow-y-auto leading-relaxed font-normal" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-                {structureResult}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Tab 4: PHÂN TÍCH TÀI LIỆU & TẠO MỚI */}
       {activeTab === 'analyzer' && (

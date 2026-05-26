@@ -96,6 +96,60 @@ export default function DocumentEditor({
     showToast('Đã xóa phiên bản')
   }
 
+  // AI Copilot States
+  const [copilotInstruction, setCopilotInstruction] = useState('')
+  const [copilotLoading, setCopilotLoading] = useState(false)
+  const [copilotResult, setCopilotResult] = useState('')
+  const [copilotError, setCopilotError] = useState('')
+
+  async function runAICopilot() {
+    if (!copilotInstruction.trim()) return
+    setCopilotLoading(true)
+    setCopilotError('')
+    setCopilotResult('')
+    
+    try {
+      const activeProvider = localStorage.getItem('ai-active-provider') || 'gemini'
+      let storageKey = 'ai-gemini-key'
+      if (activeProvider === 'deepseek') storageKey = 'ai-deepseek-key'
+      else if (activeProvider === 'anthropic') storageKey = 'ai-anthropic-key'
+      
+      const apiKey = localStorage.getItem(storageKey) || ''
+      
+      const prompt = `Yêu cầu chỉnh sửa: ${copilotInstruction.trim()}
+
+Nội dung chính hiện tại của văn bản:
+"""
+${state.mainContent.trim()}
+"""
+
+Nhiệm vụ: Hãy thực hiện yêu cầu chỉnh sửa ở trên đối với nội dung văn bản đã cho. Hãy viết bằng văn phong công vụ, hành chính, nghiêm túc, chặt chẽ của cơ quan Nhà nước Việt Nam. Kết quả đầu ra CHỈ chứa nội dung văn bản hành chính mới đã được xử lý xong, KHÔNG chứa bất kỳ lời dẫn giải thích, lời chào hay định dạng markdown bổ sung bên ngoài nào khác.`
+
+      const res = await fetch('/api/ai/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: apiKey || undefined,
+          prompt: prompt,
+          provider: activeProvider,
+          mode: 'transform'
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Có lỗi khi chạy AI Copilot')
+      }
+
+      const data = await res.json()
+      setCopilotResult(data.suggestion)
+    } catch (err: unknown) {
+      setCopilotError(err instanceof Error ? err.message : 'Có lỗi không xác định')
+    } finally {
+      setCopilotLoading(false)
+    }
+  }
+
   function handleNewDocument() {
     currentDocIdRef.current = undefined
     dispatch({ type: 'RESET' })
@@ -153,6 +207,83 @@ export default function DocumentEditor({
             style={{ fontFamily: '"Times New Roman", Times, serif' }}
             placeholder="Nhập nội dung chính của văn bản..."
           />
+
+          {state.mainContent?.trim() && (
+            <div className="p-4 bg-[#f8fafc] border-t border-[#c8d0e8] shrink-0 space-y-3 shadow-inner">
+              <div className="flex items-center gap-1.5 text-[#1e293b]">
+                <span className="text-sm">⚡</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">AI Copilot - Nâng cấp Nội dung</span>
+              </div>
+              
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={copilotInstruction}
+                  onChange={e => setCopilotInstruction(e.target.value)}
+                  placeholder="Yêu cầu AI viết thêm ý, sửa đổi hoặc viết ngắn gọn các ý..."
+                  className="flex-1 px-3 py-2 border-[1.5px] border-[#dde1ef] rounded-lg text-xs bg-white text-[#1a1f36] focus:outline-none focus:border-[#1a56b0] focus:ring-2 focus:ring-[#1a56b0]/10"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !copilotLoading && copilotInstruction.trim()) {
+                      runAICopilot()
+                    }
+                  }}
+                />
+                <button
+                  onClick={runAICopilot}
+                  disabled={copilotLoading || !copilotInstruction.trim()}
+                  className="px-4 py-2 bg-gradient-to-r from-[#1a56b0] to-[#3b52bf] hover:from-[#1345a0] hover:to-[#2e409a] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-md active:scale-[0.98] shrink-0"
+                >
+                  {copilotLoading ? '⏳ Đang viết...' : '⚡ Gửi yêu cầu'}
+                </button>
+              </div>
+
+              {copilotError && (
+                <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  ⚠️ {copilotError}
+                </div>
+              )}
+
+              {copilotResult && (
+                <div className="bg-white rounded-lg border border-[#c3d0f5] shadow-md overflow-hidden animate-slide-up">
+                  <div className="bg-[#f0f4ff] p-2 flex justify-between items-center border-b border-[#dde4f5]">
+                    <span className="text-[10px] font-bold text-[#3b52bf] flex items-center gap-1">✨ Đề xuất AI</span>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => {
+                          dispatch({ type: 'SET_FIELD', field: 'mainContent', value: copilotResult })
+                          setCopilotResult('')
+                          setCopilotInstruction('')
+                        }}
+                        className="text-[10px] bg-[#1a56b0] text-white px-2.5 py-1 rounded font-bold hover:bg-[#1345a0] transition-colors"
+                      >
+                        Áp dụng (Thay thế)
+                      </button>
+                      <button
+                        onClick={() => {
+                          const current = state.mainContent ? state.mainContent.trim() + '\n\n' : ''
+                          dispatch({ type: 'SET_FIELD', field: 'mainContent', value: current + copilotResult })
+                          setCopilotResult('')
+                          setCopilotInstruction('')
+                        }}
+                        className="text-[10px] bg-[#059669] text-white px-2.5 py-1 rounded font-bold hover:bg-[#047857] transition-colors"
+                      >
+                        Ghép tiếp vào cuối
+                      </button>
+                      <button
+                        onClick={() => setCopilotResult('')}
+                        className="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded font-semibold hover:bg-slate-200 transition-colors"
+                      >
+                        Đóng
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-3 text-xs text-[#374151] whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
+                    {copilotResult}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         {/* Right: A4 Preview */}
         <div className="w-1/2 overflow-y-auto py-10 px-8 flex justify-center">
