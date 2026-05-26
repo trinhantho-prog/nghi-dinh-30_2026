@@ -250,24 +250,12 @@ Nhiệm vụ: Hãy thực hiện yêu cầu chỉnh sửa ở trên đối với
                     <div className="flex gap-1.5">
                       <button
                         onClick={() => {
-                          dispatch({ type: 'SET_FIELD', field: 'mainContent', value: copilotResult })
-                          setCopilotResult('')
-                          setCopilotInstruction('')
+                          navigator.clipboard.writeText(copilotResult)
+                          showToast('Đã sao chép đề xuất AI vào bộ nhớ tạm ✓')
                         }}
-                        className="text-[10px] bg-[#1a56b0] text-white px-2.5 py-1 rounded font-bold hover:bg-[#1345a0] transition-colors"
+                        className="text-[10px] bg-[#1a56b0] text-white px-3 py-1.5 rounded font-bold hover:bg-[#1345a0] transition-colors flex items-center gap-1 active:scale-[0.97]"
                       >
-                        Áp dụng (Thay thế)
-                      </button>
-                      <button
-                        onClick={() => {
-                          const current = state.mainContent ? state.mainContent.trim() + '\n\n' : ''
-                          dispatch({ type: 'SET_FIELD', field: 'mainContent', value: current + copilotResult })
-                          setCopilotResult('')
-                          setCopilotInstruction('')
-                        }}
-                        className="text-[10px] bg-[#059669] text-white px-2.5 py-1 rounded font-bold hover:bg-[#047857] transition-colors"
-                      >
-                        Ghép tiếp vào cuối
+                        📋 Sao chép
                       </button>
                       <button
                         onClick={() => setCopilotResult('')}
