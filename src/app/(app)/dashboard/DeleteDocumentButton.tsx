@@ -19,7 +19,7 @@ export default function DeleteDocumentButton({ documentId }: { documentId: strin
     <button
       onClick={handleDelete}
       disabled={loading}
-      className="text-sm bg-red-50 text-red-500 px-3 py-1.5 rounded-lg font-semibold hover:bg-red-100 disabled:opacity-50 transition-colors"
+      className="text-xs bg-[#FF3B30]/10 text-[#FF3B30] px-4 py-2 rounded-full font-semibold hover:bg-[#FF3B30] hover:text-white transition-all duration-200 active:scale-[0.97] disabled:opacity-50 shrink-0 shadow-sm shadow-[#FF3B30]/5"
     >
       {loading ? '...' : 'Xóa'}
     </button>
