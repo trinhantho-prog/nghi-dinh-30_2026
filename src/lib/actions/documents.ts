@@ -166,3 +166,63 @@ export async function getDocument(documentId: string) {
     documentCount: count ?? 0,
   }
 }
+
+export async function renameFolder(oldName: string, newName: string) {
+  try {
+    const supabase = await createClient()
+    const { tenantId } = await getTenantId(supabase)
+
+    // Fetch all documents in the old folder
+    const { data: docs } = await supabase
+      .from('documents')
+      .select('id, content')
+      .eq('tenant_id', tenantId)
+
+    if (docs) {
+      for (const doc of docs) {
+        const content = doc.content as any
+        if (content && content.folder?.trim() === oldName.trim()) {
+          const updatedContent = { ...content, folder: newName.trim() }
+          await supabase
+            .from('documents')
+            .update({ content: updatedContent, updated_at: new Date().toISOString() })
+            .eq('id', doc.id)
+        }
+      }
+    }
+    revalidatePath('/dashboard')
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+export async function deleteFolder(folderName: string) {
+  try {
+    const supabase = await createClient()
+    const { tenantId } = await getTenantId(supabase)
+
+    // Fetch all documents in the folder
+    const { data: docs } = await supabase
+      .from('documents')
+      .select('id, content')
+      .eq('tenant_id', tenantId)
+
+    if (docs) {
+      for (const doc of docs) {
+        const content = doc.content as any
+        if (content && content.folder?.trim() === folderName.trim()) {
+          const updatedContent = { ...content, folder: '' }
+          await supabase
+            .from('documents')
+            .update({ content: updatedContent, updated_at: new Date().toISOString() })
+            .eq('id', doc.id)
+        }
+      }
+    }
+    revalidatePath('/dashboard')
+    return true
+  } catch (e) {
+    return false
+  }
+}

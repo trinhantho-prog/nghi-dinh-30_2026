@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { renameFolder, deleteFolder } from '@/lib/actions/documents'
 import DeleteDocumentButton from './DeleteDocumentButton'
 
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -43,10 +45,16 @@ export default function DashboardClient({
   documentCount: initialDocumentCount,
   tenantName,
 }: DashboardClientProps) {
+  const router = useRouter()
   const [folders, setFolders] = useState<string[]>([])
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({})
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
+
+  // Rename states
+  const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [loadingFolder, setLoadingFolder] = useState<string | null>(null)
 
   // Initialize folders and merge with local storage persisted ones
   useEffect(() => {
@@ -75,7 +83,7 @@ export default function DashboardClient({
     uniqueFolders.forEach(f => {
       defaultExpanded[f] = true
     })
-    setExpandedFolders(defaultExpanded)
+    setExpandedFolders(prev => ({ ...defaultExpanded, ...prev }))
   }, [initialDocuments])
 
   function handleCreateFolder() {
@@ -100,7 +108,83 @@ export default function DashboardClient({
     }
   }
 
+  async function handleRenameFolder(oldName: string) {
+    const trimmed = renameValue.trim()
+    if (!trimmed || trimmed === oldName) {
+      setRenamingFolder(null)
+      return
+    }
+
+    if (folders.includes(trimmed)) {
+      alert('Tên thư mục đã tồn tại!')
+      return
+    }
+
+    setLoadingFolder(oldName)
+    const success = await renameFolder(oldName, trimmed)
+    if (success) {
+      // Update local storage
+      const updated = folders.map(f => f === oldName ? trimmed : f).sort()
+      setFolders(updated)
+      try {
+        localStorage.setItem('dashboard_folders', JSON.stringify(updated))
+      } catch (e) {}
+
+      // Update expanded folders state
+      setExpandedFolders(prev => {
+        const copy = { ...prev }
+        copy[trimmed] = copy[oldName] ?? true
+        delete copy[oldName]
+        return copy
+      })
+
+      router.refresh()
+    } else {
+      alert('Đổi tên thư mục thất bại!')
+    }
+    setRenamingFolder(null)
+    setLoadingFolder(null)
+  }
+
+  async function handleDeleteFolder(folderName: string) {
+    const docCount = folderDocsMap[folderName]?.length ?? 0
+    let confirmMsg = `Xóa thư mục "${folderName}"?`
+    if (docCount > 0) {
+      confirmMsg += `\nCác văn bản bên trong (${docCount} văn bản) sẽ được đưa ra ngoài thư mục chính.`
+    }
+    
+    if (!confirm(confirmMsg)) return
+
+    setLoadingFolder(folderName)
+    const success = await deleteFolder(folderName)
+    if (success) {
+      // Update local storage
+      const updated = folders.filter(f => f !== folderName)
+      setFolders(updated)
+      try {
+        localStorage.setItem('dashboard_folders', JSON.stringify(updated))
+      } catch (e) {}
+
+      setExpandedFolders(prev => {
+        const copy = { ...prev }
+        delete copy[folderName]
+        return copy
+      })
+
+      router.refresh()
+    } else {
+      alert('Xóa thư mục thất bại!')
+    }
+    setLoadingFolder(null)
+  }
+
+  function startRename(folder: string) {
+    setRenamingFolder(folder)
+    setRenameValue(folder)
+  }
+
   function toggleFolder(folder: string) {
+    if (renamingFolder === folder) return // don't toggle when renaming
     setExpandedFolders(prev => ({ ...prev, [folder]: !prev[folder] }))
   }
 
@@ -134,7 +218,7 @@ export default function DashboardClient({
     return (
       <div 
         key={doc.id} 
-        className="bg-white/80 backdrop-blur-md rounded-[16px] border border-white/60 hover:border-[#007AFF]/35 hover:bg-white hover:shadow-sm transition-all duration-200 group"
+        className="bg-white/85 backdrop-blur-md rounded-[16px] border border-white/60 hover:border-[#007AFF]/35 hover:bg-white hover:shadow-sm transition-all duration-200 group"
       >
         <div className="flex items-center justify-between p-4">
           <div className="flex-1 min-w-0 pr-4">
@@ -256,6 +340,9 @@ export default function DashboardClient({
               {folders.map(folder => {
                 const folderDocs = folderDocsMap[folder] || []
                 const isExpanded = expandedFolders[folder]
+                const isLoading = loadingFolder === folder
+                const isRenaming = renamingFolder === folder
+
                 return (
                   <div 
                     key={folder}
@@ -264,27 +351,86 @@ export default function DashboardClient({
                     {/* Folder Header */}
                     <div 
                       onClick={() => toggleFolder(folder)}
-                      className="flex items-center justify-between p-5 cursor-pointer hover:bg-white/40 transition-colors duration-200 select-none"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-5 cursor-pointer hover:bg-white/40 transition-colors duration-200 select-none gap-4"
                     >
-                      <div className="flex items-center gap-3.5">
-                        <span className="text-3xl filter drop-shadow-sm leading-none">
+                      <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                        <span className="text-3xl filter drop-shadow-sm leading-none shrink-0">
                           {isExpanded ? '📂' : '📁'}
                         </span>
-                        <div>
-                          <h4 className="font-semibold text-base text-[#1d1d1f] tracking-tight">{folder}</h4>
-                          <p className="text-xs text-[#7a7a7a] mt-0.5">{folderDocs.length} văn bản</p>
-                        </div>
+                        
+                        {isRenaming ? (
+                          <div className="flex items-center gap-2 flex-1 max-w-md" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={renameValue}
+                              onChange={e => setRenameValue(e.target.value)}
+                              className="flex-1 px-3.5 py-1.5 bg-white border border-[#007AFF] rounded-full text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#007AFF]/15 text-[#1d1d1f]"
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleRenameFolder(folder)
+                                if (e.key === 'Escape') setRenamingFolder(null)
+                              }}
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleRenameFolder(folder)}
+                              disabled={isLoading}
+                              className="bg-[#007AFF] text-white px-3.5 py-1.5 rounded-full text-xs font-semibold hover:bg-[#0066cc] active:scale-[0.97] transition-all"
+                            >
+                              Lưu
+                            </button>
+                            <button
+                              onClick={() => setRenamingFolder(null)}
+                              className="bg-neutral-100 text-neutral-600 px-3.5 py-1.5 rounded-full text-xs font-semibold hover:bg-neutral-200 active:scale-[0.97] transition-all"
+                            >
+                              Hủy
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="truncate">
+                            <h4 className="font-semibold text-base text-[#1d1d1f] tracking-tight truncate flex items-center gap-2">
+                              {folder}
+                              {isLoading && <span className="text-xs text-[#7a7a7a] font-normal animate-pulse">(Đang lưu...)</span>}
+                            </h4>
+                            <p className="text-xs text-[#7a7a7a] mt-0.5">{folderDocs.length} văn bản</p>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-3.5" onClick={e => e.stopPropagation()}>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          {/* Rename Folder Button */}
+                          <button
+                            onClick={() => startRename(folder)}
+                            disabled={isLoading}
+                            title="Đổi tên thư mục"
+                            className="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0]/70 hover:border-[#007AFF]/40 hover:text-[#007AFF] text-[#7a7a7a] text-xs transition-all duration-200 active:scale-[0.93] shadow-sm hover:bg-[#e8f0fe]/30"
+                          >
+                            ✏️
+                          </button>
+
+                          {/* Delete Folder Button */}
+                          <button
+                            onClick={() => handleDeleteFolder(folder)}
+                            disabled={isLoading}
+                            title="Xóa thư mục"
+                            className="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0]/70 hover:border-red-500/40 hover:text-red-500 text-[#7a7a7a] text-xs transition-all duration-200 active:scale-[0.93] shadow-sm hover:bg-red-50"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+
+                        <div className="h-4 w-[1px] bg-[#e0e0e0] mx-1 hidden sm:block" />
+
                         <Link
                           href={`/documents/new?folder=${encodeURIComponent(folder)}`}
-                          className="text-[11px] bg-[#007AFF]/10 text-[#007AFF] border border-[#007AFF]/15 hover:bg-[#007AFF] hover:text-white px-4 py-2.5 rounded-full font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
+                          className={`text-[11px] bg-[#007AFF]/10 text-[#007AFF] border border-[#007AFF]/15 hover:bg-[#007AFF] hover:text-white px-4 py-2.5 rounded-full font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] ${isLoading ? 'pointer-events-none opacity-50' : ''}`}
                         >
                           + Văn bản trong thư mục
                         </Link>
                         <button 
                           onClick={() => toggleFolder(folder)}
-                          className="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0] hover:bg-neutral-50 text-[#7a7a7a] font-bold text-xs transition-all duration-200"
+                          disabled={isLoading}
+                          className="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0] hover:bg-neutral-50 text-[#7a7a7a] font-bold text-xs transition-all duration-200 shrink-0"
                         >
                           {isExpanded ? '▲' : '▼'}
                         </button>
