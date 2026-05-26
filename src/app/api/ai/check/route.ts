@@ -103,29 +103,45 @@ async function callAnthropic(apiKey: string, prompt: string) {
   return data.content[0].text as string
 }
 
-async function callGemini(apiKey: string, model: string, prompt: string) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: LINTER_SYSTEM_PROMPT }] },
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.1,
-          topP: 0.1,
-        },
-      }),
+async function callGemini(apiKey: string, model: string, prompt: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: LINTER_SYSTEM_PROMPT }] },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.1,
+            topP: 0.1,
+          },
+        }),
+      }
+    )
+    if (!res.ok) {
+      const err = await res.json()
+      const errMsg = err.error?.message || ''
+      
+      if ((res.status === 429 || res.status === 503 || errMsg.toLowerCase().includes('demand') || errMsg.toLowerCase().includes('exhausted')) && model !== 'gemini-1.5-flash') {
+        console.warn(`[Gemini Fallback] Model ${model} gặp lỗi quá tải. Tự động chuyển đổi sang gemini-1.5-flash...`)
+        return callGemini(apiKey, 'gemini-1.5-flash', prompt)
+      }
+      
+      throw new Error(errMsg || `Lỗi Gemini API: ${res.status}`)
     }
-  )
-  if (!res.ok) {
-    const err = await res.json()
-    throw new Error(err.error?.message || `Lỗi Gemini API: ${res.status}`)
+    const data = await res.json()
+    return data.candidates[0].content.parts[0].text as string
+  } catch (error: any) {
+    const msg = error.message || ''
+    if ((msg.toLowerCase().includes('demand') || msg.toLowerCase().includes('exhausted') || msg.toLowerCase().includes('fetch')) && model !== 'gemini-1.5-flash') {
+      console.warn(`[Gemini Fallback] Model ${model} gặp lỗi. Tự động chuyển đổi sang gemini-1.5-flash...`)
+      return callGemini(apiKey, 'gemini-1.5-flash', prompt)
+    }
+    throw error;
   }
-  const data = await res.json()
-  return data.candidates[0].content.parts[0].text as string
 }
 
 async function callDeepSeek(apiKey: string, prompt: string) {
