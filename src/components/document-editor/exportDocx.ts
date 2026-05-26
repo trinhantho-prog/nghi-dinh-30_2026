@@ -79,7 +79,7 @@ function createBodyParagraph(text: string, bold = false, fontSize = 28, isFreeTe
   const normalizedText = isFreeText ? normalizeFreeText(text) : normalizeBodyText(text)
   return new Paragraph({
     alignment: AlignmentType.BOTH,
-    contextualSpacing: true,
+    contextualSpacing: false,
     indent: { firstLine: cmToTwip(1.27), left: 0 },
     spacing: { before: 120, after: 120, line: 360, lineRule: LineRuleType.EXACTLY },
     children: [new TextRun({ text: normalizedText, font: 'Times New Roman', size: fontSize, bold })],
@@ -90,7 +90,7 @@ function createBodyParagraph(text: string, bold = false, fontSize = 28, isFreeTe
 function createLegalBasisParagraph(text: string, fontSize = 28) {
   return new Paragraph({
     alignment: AlignmentType.BOTH,
-    contextualSpacing: true,
+    contextualSpacing: false,
     indent: { firstLine: cmToTwip(1.27), left: 0 },
     spacing: { before: 120, after: 120, line: 360, lineRule: LineRuleType.EXACTLY },
     children: [new TextRun({ text, font: 'Times New Roman', size: fontSize, bold: false })],

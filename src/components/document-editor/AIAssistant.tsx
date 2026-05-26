@@ -9,7 +9,7 @@ interface AIAssistantProps {
   onIssuesChange?: (issues: AIIssue[]) => void
 }
 
-type Tab = 'linter' | 'transformer' | 'structure'
+type Tab = 'linter' | 'transformer' | 'structure' | 'analyzer'
 type Provider = 'gemini' | 'deepseek' | 'anthropic'
 
 interface TransitionPhrase {
@@ -67,6 +67,16 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
   const [structureLoading, setStructureLoading] = useState(false)
   const [structureResult, setStructureResult] = useState('')
   const [structureError, setStructureError] = useState('')
+
+  // States cho Phân tích tài liệu & Tạo mới
+  const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const [extractedText, setExtractedText] = useState<string>('')
+  const [extractLoading, setExtractLoading] = useState(false)
+  const [extractError, setExtractError] = useState('')
+  const [analyzerPrompt, setAnalyzerPrompt] = useState('')
+  const [analyzerLoading, setAnalyzerLoading] = useState(false)
+  const [analyzerError, setAnalyzerError] = useState('')
+  const [analyzerResult, setAnalyzerResult] = useState<Record<string, string> | null>(null)
 
   // Tải API keys từ Local Storage
   useEffect(() => {
@@ -280,6 +290,111 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
     }
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setAttachedFile(file)
+    setExtractedText('')
+    setExtractError('')
+    setExtractLoading(true)
+    setAnalyzerResult(null)
+    
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      const res = await fetch('/api/ai/extract', {
+        method: 'POST',
+        body: formData
+      })
+      
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Không thể trích xuất nội dung từ file này')
+      }
+      
+      const data = await res.json()
+      setExtractedText(data.text || '')
+    } catch (err: unknown) {
+      setExtractError(err instanceof Error ? err.message : 'Có lỗi xảy ra khi đọc file')
+      setAttachedFile(null)
+    } finally {
+      setExtractLoading(false)
+    }
+  }
+
+  const runDocumentAnalyzer = async () => {
+    if (!extractedText.trim() && !attachedFile) {
+      setAnalyzerError('Vui lòng đính kèm tài liệu trước.')
+      return
+    }
+    if (!analyzerPrompt.trim()) {
+      setAnalyzerError('Vui lòng nhập yêu cầu soạn thảo văn bản.')
+      return
+    }
+    
+    setAnalyzerLoading(true)
+    setAnalyzerError('')
+    setAnalyzerResult(null)
+    
+    try {
+      const res = await fetch('/api/ai/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: apiKeys[provider]?.trim() || undefined,
+          prompt: analyzerPrompt.trim(),
+          docContent: extractedText,
+          provider: provider,
+          mode: 'analyzer'
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Có lỗi khi phân tích tài liệu')
+      }
+
+      const data = await res.json()
+      
+      // Parse JSON safely
+      let parsed: Record<string, string> = {}
+      try {
+        let cleaned = data.suggestion.trim()
+        if (cleaned.startsWith('```json')) {
+          cleaned = cleaned.substring(7)
+        } else if (cleaned.startsWith('```')) {
+          cleaned = cleaned.substring(3)
+        }
+        if (cleaned.endsWith('```')) {
+          cleaned = cleaned.substring(0, cleaned.length - 3)
+        }
+        cleaned = cleaned.trim()
+        parsed = JSON.parse(cleaned)
+      } catch (parseErr) {
+        console.error('Lỗi parse JSON:', parseErr, data.suggestion)
+        throw new Error('Kết quả AI trả về không đúng định dạng cấu trúc JSON hành chính. Vui lòng thử lại!')
+      }
+
+      setAnalyzerResult(parsed)
+    } catch (e: unknown) {
+      setAnalyzerError(e instanceof Error ? e.message : 'Có lỗi không xác định')
+    } finally {
+      setAnalyzerLoading(false)
+    }
+  }
+
+  const handleApplyAnalyzerResult = () => {
+    if (!analyzerResult) return
+    
+    Object.entries(analyzerResult).forEach(([key, val]) => {
+      if (val && typeof val === 'string') {
+        dispatch({ type: 'SET_FIELD', field: key as keyof DocumentState, value: val })
+      }
+    })
+  }
+
   const inputCls = 'w-full px-3 py-2 border-[1.5px] border-[#dde1ef] rounded-md text-xs font-[inherit] bg-white text-[#1a1f36] focus:outline-none focus:border-[#1a56b0] focus:ring-2 focus:ring-[#1a56b0]/10'
 
   return (
@@ -321,30 +436,38 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
       </div>
 
       {/* 2. Menu Tabs Tiêu đề */}
-      <div className="flex border-b border-[#dde1ef]">
+      <div className="flex border-b border-[#dde1ef] gap-1 overflow-x-auto scrollbar-none pb-0.5">
         <button
           onClick={() => setActiveTab('linter')}
-          className={`flex-1 pb-2 text-xs font-bold text-center border-b-2 transition-all ${
+          className={`flex-1 pb-2 text-[10px] font-bold text-center border-b-2 transition-all whitespace-nowrap ${
             activeTab === 'linter' ? 'border-[#3b52bf] text-[#3b52bf]' : 'border-transparent text-[#6b7597] hover:text-[#475569]'
           }`}
         >
-          🔍 Quét Thể Thức
+          🔍 Thể Thức
         </button>
         <button
           onClick={() => setActiveTab('transformer')}
-          className={`flex-1 pb-2 text-xs font-bold text-center border-b-2 transition-all ${
+          className={`flex-1 pb-2 text-[10px] font-bold text-center border-b-2 transition-all whitespace-nowrap ${
             activeTab === 'transformer' ? 'border-[#3b52bf] text-[#3b52bf]' : 'border-transparent text-[#6b7597] hover:text-[#475569]'
           }`}
         >
-          ✍️ Hành Chính Hóa
+          ✍️ Hành Chính
         </button>
         <button
           onClick={() => setActiveTab('structure')}
-          className={`flex-1 pb-2 text-xs font-bold text-center border-b-2 transition-all ${
+          className={`flex-1 pb-2 text-[10px] font-bold text-center border-b-2 transition-all whitespace-nowrap ${
             activeTab === 'structure' ? 'border-[#3b52bf] text-[#3b52bf]' : 'border-transparent text-[#6b7597] hover:text-[#475569]'
           }`}
         >
-          📊 Báo Cáo 3 Phần
+          📊 Báo Cáo
+        </button>
+        <button
+          onClick={() => setActiveTab('analyzer')}
+          className={`flex-1 pb-2 text-[10px] font-bold text-center border-b-2 transition-all whitespace-nowrap ${
+            activeTab === 'analyzer' ? 'border-[#3b52bf] text-[#3b52bf]' : 'border-transparent text-[#6b7597] hover:text-[#475569]'
+          }`}
+        >
+          📁 Phân Tích
         </button>
       </div>
 
@@ -575,6 +698,237 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
               </div>
               <div className="p-3 text-[11px] text-[#374151] whitespace-pre-wrap max-h-52 overflow-y-auto leading-relaxed font-normal" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                 {structureResult}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab 4: PHÂN TÍCH TÀI LIỆU & TẠO MỚI */}
+      {activeTab === 'analyzer' && (
+        <div className="space-y-4 animate-fade-in">
+          {/* File Upload Zone */}
+          {!attachedFile && !extractLoading && (
+            <label className="border-2 border-dashed border-[#c3d0f5] hover:border-[#3b52bf] rounded-xl p-5 flex flex-col items-center justify-center gap-2 cursor-pointer bg-white/50 hover:bg-[#3b52bf]/5 transition-all duration-200 group active:scale-[0.99]">
+              <input
+                type="file"
+                onChange={handleFileUpload}
+                accept=".docx,.xlsx,.doc,.xls,.pdf"
+                className="hidden"
+                disabled={extractLoading}
+              />
+              <div className="p-3 rounded-full bg-[#3b52bf]/10 group-hover:bg-[#3b52bf]/20 transition-colors">
+                <svg className="w-6 h-6 text-[#3b52bf]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+              <div className="text-center">
+                <p className="text-xs font-bold text-[#1e293b] group-hover:text-[#3b52bf] transition-colors">Kéo thả tài liệu hoặc click để chọn</p>
+                <p className="text-[10px] text-[#6b7597] mt-1 font-medium">Hỗ trợ DOCX, XLSX, DOC, XLS, PDF</p>
+              </div>
+            </label>
+          )}
+
+          {/* Text Extracting Indicator */}
+          {extractLoading && (
+            <div className="flex flex-col items-center justify-center p-6 bg-white rounded-xl border border-[#dde1ef] gap-2.5 animate-pulse">
+              <div className="w-8 h-8 rounded-full border-[3px] border-[#3b52bf]/20 border-t-[#3b52bf] animate-spin" />
+              <p className="text-[11px] font-bold text-[#475569]">Đang trích xuất nội dung từ file...</p>
+            </div>
+          )}
+
+          {extractError && (
+            <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              ⚠️ {extractError}
+            </div>
+          )}
+
+          {/* Attached File Preview */}
+          {attachedFile && !extractLoading && (
+            <div className="flex items-center gap-3 p-3 bg-white border border-[#dde1ef] rounded-xl shadow-sm relative overflow-hidden group">
+              <div className={`absolute top-0 left-0 bottom-0 w-1 ${
+                attachedFile.name.endsWith('.pdf') ? 'bg-red-500' :
+                (attachedFile.name.endsWith('.xlsx') || attachedFile.name.endsWith('.xls')) ? 'bg-green-500' : 'bg-blue-500'
+              }`} />
+              
+              <div className="pl-1 shrink-0">
+                {attachedFile.name.endsWith('.pdf') ? (
+                  <svg className="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                  </svg>
+                ) : (attachedFile.name.endsWith('.xlsx') || attachedFile.name.endsWith('.xls')) ? (
+                  <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold text-[#1e293b] truncate" title={attachedFile.name}>{attachedFile.name}</p>
+                <p className="text-[9px] text-[#6b7597] font-medium mt-0.5">
+                  {(attachedFile.size / 1024).toFixed(1)} KB • {extractedText ? 'Đã tải thành công ✓' : 'Chưa đọc được dữ liệu'}
+                </p>
+              </div>
+              
+              <button
+                onClick={() => {
+                  setAttachedFile(null)
+                  setExtractedText('')
+                  setExtractError('')
+                  setAnalyzerResult(null)
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                title="Xóa file"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* User Prompt Textarea */}
+          <div>
+            <label className="block text-[11px] font-bold text-[#6b7597] mb-1.5 flex items-center gap-1">
+              📝 Yêu cầu soạn thảo văn bản:
+            </label>
+            <textarea
+              value={analyzerPrompt}
+              onChange={e => setAnalyzerPrompt(e.target.value)}
+              rows={4}
+              placeholder="Nhập hướng dẫn viết văn bản từ file đính kèm...
+Ví dụ: Gợi ý viết nội dung file đính kèm theo Chủ đề: 'Phát huy sức mạnh văn hóa con người Đồng Tháp; đề cao trách nhiệm của cán bộ, đảng viên...'"
+              className={`${inputCls} resize-y leading-relaxed text-xs`}
+            />
+          </div>
+
+          {/* Error Message */}
+          {analyzerError && (
+            <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              ⚠️ {analyzerError}
+            </div>
+          )}
+
+          {/* Action Button */}
+          <button
+            onClick={runDocumentAnalyzer}
+            disabled={analyzerLoading || extractLoading || !attachedFile || !analyzerPrompt.trim()}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-[#1a56b0] to-[#3b52bf] text-white hover:from-[#1345a0] hover:to-[#2e409a] disabled:opacity-50 transition-all duration-200 shadow-md transform hover:translate-y-[-1px] active:translate-y-[0px] cursor-pointer"
+          >
+            {analyzerLoading ? (
+              <>
+                <span className="w-3.5 h-3.5 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+                <span>⏳ Đang phân tích &amp; Soạn thảo...</span>
+              </>
+            ) : (
+              <>
+                <span>⚡ Phân tích &amp; Soạn thảo văn bản</span>
+              </>
+            )}
+          </button>
+
+          {/* Analyzer Suggestion Result Block */}
+          {analyzerResult && (
+            <div className="bg-white rounded-xl border border-[#c3d0f5] shadow-md overflow-hidden animate-slide-up space-y-0.5">
+              <div className="bg-[#f0f4ff] p-3 flex justify-between items-center border-b border-[#dde4f5]">
+                <div className="flex flex-col">
+                  <span className="text-[11px] font-bold text-[#1a56b0]">✨ Văn bản soạn thảo thành công!</span>
+                  <span className="text-[9px] text-[#6b7597] font-medium mt-0.5">Đã tạo cấu trúc văn bản chi tiết</span>
+                </div>
+                <button
+                  onClick={handleApplyAnalyzerResult}
+                  className="text-[10px] bg-[#10b981] text-white hover:bg-[#059669] px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm flex items-center gap-1 active:scale-[0.97]"
+                >
+                  <span>⚡ Áp dụng tất cả</span>
+                </button>
+              </div>
+              
+              <div className="p-3 space-y-3 max-h-96 overflow-y-auto divide-y divide-slate-100">
+                {/* Thể loại */}
+                {analyzerResult.docType && (
+                  <div className="pt-2 first:pt-0">
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Thể loại</span>
+                    <span className="text-[10px] font-bold text-[#1e293b] bg-slate-50 px-2 py-1 rounded border border-slate-100 uppercase">{analyzerResult.docType}</span>
+                  </div>
+                )}
+                
+                {/* Trích yếu */}
+                {analyzerResult.docSummary && (
+                  <div className="pt-2">
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Trích yếu nội dung</span>
+                    <span className="text-xs font-bold text-[#374151] leading-relaxed block">{analyzerResult.docSummary}</span>
+                  </div>
+                )}
+                
+                {/* Kính gửi */}
+                {analyzerResult.recipient && (
+                  <div className="pt-2">
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Kính gửi</span>
+                    <span className="text-xs text-[#374151] block font-medium">{analyzerResult.recipient}</span>
+                  </div>
+                )}
+                
+                {/* Căn cứ */}
+                {analyzerResult.legalBasis && (
+                  <div className="pt-2">
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Căn cứ pháp lý</span>
+                    <p className="text-xs text-[#475569] leading-relaxed whitespace-pre-wrap font-serif bg-slate-50 p-2 rounded border border-slate-100">
+                      {analyzerResult.legalBasis}
+                    </p>
+                  </div>
+                )}
+
+                {/* Đặt vấn đề */}
+                {analyzerResult.issueStatement && (
+                  <div className="pt-2">
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Câu đặt vấn đề</span>
+                    <p className="text-xs text-[#475569] leading-relaxed whitespace-pre-wrap font-serif bg-slate-50 p-2 rounded border border-slate-100">
+                      {analyzerResult.issueStatement}
+                    </p>
+                  </div>
+                )}
+                
+                {/* Nội dung chính */}
+                {analyzerResult.mainContent && (
+                  <div className="pt-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold">Nội dung chính</span>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(analyzerResult.mainContent)}
+                        className="text-[9px] bg-slate-100 hover:bg-slate-200 text-[#475569] px-2 py-0.5 rounded font-medium border border-slate-200 transition-colors"
+                      >
+                        📋 Copy nội dung
+                      </button>
+                    </div>
+                    <p className="text-xs text-[#1e293b] leading-relaxed whitespace-pre-wrap font-serif bg-slate-50 p-2 rounded border border-slate-100 max-h-48 overflow-y-auto">
+                      {analyzerResult.mainContent}
+                    </p>
+                  </div>
+                )}
+                
+                {/* Kết luận */}
+                {analyzerResult.conclusion && (
+                  <div className="pt-2">
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Kết luận / Yêu cầu</span>
+                    <p className="text-xs text-[#475569] leading-relaxed whitespace-pre-wrap font-serif bg-slate-50 p-2 rounded border border-slate-100">
+                      {analyzerResult.conclusion}
+                    </p>
+                  </div>
+                )}
+
+                {/* Nơi nhận */}
+                {analyzerResult.recipientsCc && (
+                  <div className="pt-2">
+                    <span className="text-[9px] uppercase tracking-wide text-[#7b8abf] font-bold block mb-1">Nơi nhận</span>
+                    <p className="text-[11px] text-[#475569] leading-relaxed whitespace-pre-wrap bg-slate-50 p-2 rounded border border-slate-100">
+                      {analyzerResult.recipientsCc}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}

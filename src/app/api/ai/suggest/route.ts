@@ -40,6 +40,36 @@ Hãy sử dụng văn phong công vụ đặc biệt trang trọng, đúng chu�
 - Tự động tích hợp từ/cụm từ chuyển đoạn (starter/transition) được chọn vào đầu đoạn văn.
 - Kết quả đầu ra CHỈ chứa đoạn văn bản được soạn thảo, không có lời dẫn hay giải thích nào khác.`
 
+const DOCUMENT_ANALYZER_SYSTEM_PROMPT = `Bạn là một trợ lý AI chuyên nghiệp phân tích tài liệu hành chính và soạn thảo văn bản tự động theo Nghị định 30/2020/NĐ-CP của Chính phủ Việt Nam.
+
+Nhiệm vụ của bạn:
+1. Tiếp nhận tài liệu đính kèm (dạng văn bản được trích xuất) và yêu cầu/chủ đề từ người dùng.
+2. Phân tích kết cấu, nội dung chính, thông tin nhân sự/địa danh trong tài liệu đính kèm.
+3. Soạn thảo một văn bản hành chính mới hoàn toàn chuẩn mực, đáp ứng chính xác chủ đề người dùng yêu cầu, dựa trên kết cấu hoặc dữ liệu của tài liệu đính kèm.
+4. Trả về kết quả dưới dạng JSON có cấu trúc chính xác theo các trường sau để hệ thống tự động điền vào biểu mẫu.
+
+### CẤU TRÚC JSON ĐẦU RA BẮT BUỘC:
+{
+  "docType": "cong-van" | "bao-cao" | "thong-bao" | "ke-hoach" | "bien-ban",
+  "docSummary": "Trích yếu nội dung của văn bản (dài khoảng 1-2 dòng, viết thường, không có dấu chấm ở cuối câu. Ví dụ: 'Về việc triển khai chiến dịch tiêm chủng mở rộng năm 2026')",
+  "recipient": "Tên cơ quan/cá nhân nhận văn bản (chỉ dành cho Công văn, ví dụ: 'Các phòng ban thuộc Bảo hiểm xã hội tỉnh Đồng Tháp', các loại văn bản khác để trống)",
+  "legalBasis": "Các căn cứ pháp lý, mỗi căn cứ viết trên một dòng mới độc lập. Lưu ý giữ nguyên câu văn hành chính trang trọng. Ví dụ: 'Căn cứ Luật Bảo hiểm xã hội số 58/2014/QH13 ngày 20/11/2014;\\nCăn cứ Nghị định số 30/2020/NĐ-CP ngày 05/3/2020 của Chính phủ về công tác văn thư.'",
+  "issueStatement": "Câu đặt vấn đề/nhập đề dẫn dắt vào nội dung chính (ví dụ: 'Thực hiện kế hoạch công tác năm và nhằm nâng cao chất lượng dịch vụ...')",
+  "mainContent": "Nội dung chính chi tiết của văn bản hành chính. Viết cực kỳ đầy đủ, hoàn chỉnh (không viết tắt, không dùng ký hiệu tắt, không dùng placeholder như '...', không tóm tắt đại khái). Phải có các mục rõ ràng (như I, II, III hoặc 1, 2, 3) tương ứng với nội dung phân tích từ file đính kèm và yêu cầu của người dùng. Mỗi đoạn văn phải tự nhiên, mạch lạc, trang trọng và nghiêm túc.",
+  "conclusion": "Phần kết luận, yêu cầu hoặc lời đề nghị ở cuối văn bản (ví dụ: 'Đơn vị kính trình Lãnh đạo cấp trên xem xét, chỉ đạo thực hiện. Xin trân trọng cảm ơn.')",
+  "recipientsCc": "Nơi nhận chi tiết dưới dạng danh sách xuống dòng. Ví dụ: '- Như trên;\\n- Lãnh đạo BHXH tỉnh (để b/c);\\n- Lưu: VT, Tổ CNTT.'",
+  "partyAUnit": "Tên đơn vị bên A (chỉ dành cho Biên bản, các loại khác để trống)",
+  "partyAPosition": "Chức vụ bên A (chỉ dành cho Biên bản, các loại khác để trống)",
+  "partyAName": "Họ tên bên A (chỉ dành cho Biên bản, các loại khác để trống)",
+  "partyBUnit": "Tên đơn vị bên B (chỉ dành cho Biên bản, các loại khác để trống)",
+  "partyBPosition": "Chức vụ bên B (chỉ dành cho Biên bản, các loại khác để trống)",
+  "partyBName": "Họ tên bên B (chỉ dành cho Biên bản, các loại khác để trống)"
+}
+
+LƯU Ý QUAN TRỌNG:
+- Chỉ trả ra một khối JSON duy nhất hợp lệ. KHÔNG thêm bất kỳ từ dẫn giải, giải thích hay markdown rác bên ngoài khối JSON.
+- Đảm bảo trích xuất đầy đủ, thông minh và soạn thảo hoàn chỉnh, cá nhân hóa sâu sắc theo đúng ngữ cảnh thực tế (như các tên riêng trong file đính kèm).`
+
 async function callAnthropic(apiKey: string, systemPrompt: string, userMessage: string) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -162,7 +192,9 @@ export async function POST(request: Request) {
 
     const systemPrompt = mode === 'structure'
       ? STRUCTURED_SUGGEST_SYSTEM_PROMPT
-      : STYLE_TRANSFORMER_SYSTEM_PROMPT
+      : mode === 'analyzer'
+        ? DOCUMENT_ANALYZER_SYSTEM_PROMPT
+        : STYLE_TRANSFORMER_SYSTEM_PROMPT
 
     const userMessage = docContent?.trim()
       ? `Dựa trên nội dung tài liệu đính kèm:\n\n${docContent.substring(0, 8000)}\n\n---\n\n${prompt}`
