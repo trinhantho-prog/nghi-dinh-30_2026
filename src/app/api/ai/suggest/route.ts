@@ -118,8 +118,6 @@ async function callGemini(apiKey: string, model: string, systemPrompt: string, u
           generationConfig: {
             temperature: 0.25,
             topP: 0.85,
-            frequencyPenalty: 0.1,
-            presencePenalty: 0.0,
             maxOutputTokens: 4000,
           },
         }),
