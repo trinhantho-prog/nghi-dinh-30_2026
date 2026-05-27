@@ -85,8 +85,8 @@ Căn cứ pháp lý là phần cực kỳ quan trọng, dễ mắc lỗi thể t
 *   **Căn lề:** Căn đều hai bên (`AlignmentType.BOTH` / `textAlign: justify`) để trang văn bản phẳng phiu, chuyên nghiệp.
 *   **Thụt dòng:** Thụt lề dòng đầu tiên (`textIndent` / `firstLine`) đúng **1.27cm**.
 *   **Giãn dòng (Line & Paragraph Spacing):**
-    *   Giãn dòng chính xác **1.5 lines** (Word twip = 300, lineRule = `EXACTLY`).
-    *   Khoảng cách sau mỗi đoạn văn (`after`) là **120 Twip** (~6pt) để tạo khoảng thở vừa phải giữa các nội dung.
+    *   Giãn dòng chính xác **Exactly 18pt** (Word twip = 360, lineRule = `EXACTLY`).
+    *   Khoảng cách trước/sau mỗi đoạn văn (`before` và `after`) là **120 Twip** (~6pt) để tạo bố cục cân đối và đồng đều.
 
 ### 6.2. Phân tích & Chuẩn hóa Đầu mục tự động (`normalizeBodyText` & `isHeadingLine`)
 Hệ thống tự động nhận diện cấu trúc đầu mục để định dạng kiểu chữ và dấu câu:

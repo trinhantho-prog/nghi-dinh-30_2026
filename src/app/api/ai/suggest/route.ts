@@ -191,7 +191,7 @@ export async function POST(request: Request) {
       if (!apiKey) {
         apiKey = process.env.GEMINI_PAID_API_KEY || process.env.GEMINI_API_KEY
       }
-      model = process.env.GEMINI_PAID_MODEL || 'gemini-2.5-pro'
+      model = process.env.GEMINI_PAID_MODEL || 'gemini-2.5-flash-lite'
       if (!apiKey) {
         return NextResponse.json({ error: 'Thiếu API Key cho Gemini trả phí' }, { status: 400 })
       }

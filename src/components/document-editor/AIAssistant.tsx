@@ -100,7 +100,7 @@ export default function AIAssistant({ state, dispatch, onIssuesChange }: AIAssis
         type: 'warning',
         description: 'Dòng trống liên tiếp',
         suggestion: 'Xóa bớt dòng trống thừa',
-        reason: 'Có nhiều dòng trống liên tục. Nghị định 30 yêu cầu giãn dòng đồng đều 1.5 lines và khoảng cách đoạn 6pt, không chèn nhiều dòng trống.'
+        reason: 'Có nhiều dòng trống liên tục. Nghị định 30 yêu cầu giãn dòng đồng đều Exactly 18pt và khoảng cách đoạn 6pt, không chèn nhiều dòng trống.'
       } as AIIssue)
     }
 

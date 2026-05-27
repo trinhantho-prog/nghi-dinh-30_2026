@@ -165,6 +165,24 @@ export async function exportDocx(state: DocumentState) {
   const mainContentBlocks = getEffectiveMainContentBlocks(state)
 
   const doc = new Document({
+    styles: {
+      default: {
+        document: {
+          run: {
+            font: 'Times New Roman',
+            size: bodyFontSize,
+          },
+          paragraph: {
+            spacing: {
+              before: 120,
+              after: 120,
+              line: 360,
+              lineRule: LineRuleType.EXACTLY,
+            },
+          },
+        },
+      },
+    },
     sections: [{
       properties: {
         page: {
