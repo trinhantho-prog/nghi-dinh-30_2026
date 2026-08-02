@@ -96,7 +96,7 @@ export default function Sidebar({
       {/* Header */}
       <header className="px-6 py-4 bg-[#1a56b0] text-white shrink-0">
         <h1 className="text-[1.1rem] font-bold tracking-[0.01em]">📄 Thể thức văn bản</h1>
-        <p className="text-[0.78rem] opacity-80 mt-0.5">Tác giả: Trần Trí Nhân</p>
+        <p className="text-[0.78rem] opacity-80 mt-0.5">Tác giả: Liêu Xuân Đào</p>
         <p className="text-[0.78rem] opacity-80 mt-0.5">Soạn thảo tự động – Chuẩn Nghị định 30/2020/NĐ-CP</p>
       </header>
 
