@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { DocumentState } from '@/types'
+import { DocumentState, Agency, Signer } from '@/types'
 import { revalidatePath } from 'next/cache'
 import {
   getLocalDocuments,
@@ -12,21 +12,25 @@ import {
   deleteLocalDocument,
   renameLocalFolder,
   deleteLocalFolder,
+  saveLocalConfig,
 } from '@/lib/storage/local-db'
 
 async function getTenantId(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Chưa đăng nhập')
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data } = await supabase
+        .from('tenant_members')
+        .select('tenant_id')
+        .eq('user_id', user.id)
+        .single()
 
-  const { data } = await supabase
-    .from('tenant_members')
-    .select('tenant_id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!data) throw new Error('Không thuộc tổ chức nào')
-  return { tenantId: data.tenant_id, userId: user.id }
+      if (data) return { tenantId: data.tenant_id, userId: user.id }
+    }
+  } catch (e) {}
+  return { tenantId: 'local_tenant', userId: 'local_user' }
 }
+
 
 export async function saveDocument(
   state: DocumentState,
@@ -277,3 +281,18 @@ export async function deleteFolder(folderName: string) {
     return true
   }
 }
+
+export async function saveTenantConfig(agencies: Agency[], signers: Signer[]) {
+  try {
+    const supabase = await createClient()
+    const { tenantId } = await getTenantId(supabase)
+    await supabase.from('tenant_config').upsert({ tenant_id: tenantId, agencies, signers, updated_at: new Date().toISOString() })
+  } catch (e) {
+    console.warn('Supabase offline/error, saving config to local DB')
+  }
+  await saveLocalConfig({ agencies, signers })
+  revalidatePath('/dashboard')
+  revalidatePath('/settings')
+  return true
+}
+

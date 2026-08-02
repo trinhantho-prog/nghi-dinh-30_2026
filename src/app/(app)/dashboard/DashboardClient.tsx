@@ -269,13 +269,9 @@ export default function DashboardClient({
           >
             Cài đặt
           </Link>
-          <form action="/auth/signout" method="post">
-            <button className="text-xs bg-white/60 border border-[#FF3B30]/20 hover:bg-[#FF3B30]/5 text-[#FF3B30] px-4 py-2 rounded-full font-semibold transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] shadow-sm shadow-black/5">
-              Đăng xuất
-            </button>
-          </form>
         </div>
       </nav>
+
 
       <main className="max-w-4xl mx-auto px-6 py-12">
         {/* Sleek Apple Header */}

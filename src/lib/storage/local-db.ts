@@ -225,3 +225,11 @@ export async function deleteLocalFolder(folderName: string) {
   if (updated) saveDBFile(db)
   return true
 }
+
+export async function saveLocalConfig(config: LocalTenantConfigRecord) {
+  const db = ensureDBFile()
+  db.config = config
+  saveDBFile(db)
+  return true
+}
+

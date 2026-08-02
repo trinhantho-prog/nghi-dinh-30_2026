@@ -182,15 +182,9 @@ async function callDeepSeek(apiKey: string, prompt: string) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 })
-
-    const allowed = await checkRateLimit(user.id, supabase)
-    if (!allowed) return NextResponse.json({ error: 'Đã đạt giới hạn 100 lần kiểm tra hôm nay' }, { status: 429 })
-
     const { documentData, apiKey: customApiKey, provider = 'gemini' } = await request.json()
     const prompt = buildPrompt(documentData)
+
 
     let apiKey = customApiKey?.trim()
     let selectedProvider = provider
