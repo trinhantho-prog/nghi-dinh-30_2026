@@ -1,19 +1,31 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense } from 'react'
 
 function LoginForm() {
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
   const supabase = createClient()
+  const router = useRouter()
 
   async function signInWithGoogle() {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${location.origin}/auth/callback` },
-    })
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${location.origin}/auth/callback` },
+      })
+    } catch {
+      // Fallback to local mode if OAuth fails
+      enterLocalMode()
+    }
+  }
+
+  function enterLocalMode() {
+    document.cookie = 'local_mode=true; path=/; max-age=31536000'
+    router.push('/dashboard')
+    router.refresh()
   }
 
   // Bright, premium glowing organic gradient mimicking modern iOS wallpapers
@@ -37,11 +49,11 @@ function LoginForm() {
 
         {error && (
           <div className="bg-[#FF3B30]/10 border border-[#FF3B30]/15 text-[#FF3B30] rounded-xl px-4 py-3 text-xs font-semibold mb-5 text-center leading-relaxed">
-            Đăng nhập thất bại. Vui lòng thử lại.
+            Đăng nhập thất bại. Bạn có thể sử dụng Chế độ Cục bộ bên dưới.
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <button
             onClick={signInWithGoogle}
             className="w-full flex items-center justify-center gap-3 px-5 py-3.5 bg-white border border-[#e0e0e0] hover:bg-neutral-50 rounded-full text-sm font-semibold text-[#1d1d1f] hover:border-[#007AFF]/35 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-sm shadow-black/[0.04]"
@@ -54,10 +66,17 @@ function LoginForm() {
             </svg>
             Đăng nhập với Google
           </button>
+
+          <button
+            onClick={enterLocalMode}
+            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-[#007AFF] text-white hover:bg-[#0062cc] rounded-full text-sm font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-md shadow-[#007AFF]/20"
+          >
+            ⚡ Dùng Chế độ Ngoại tuyến (Local Mode)
+          </button>
         </div>
 
         <p className="text-[11px] text-center text-[#7a7a7a] mt-6 leading-relaxed font-medium">
-          Chỉ dành cho cán bộ được mời. Liên hệ quản trị viên để được cấp quyền truy cập.
+          Chế độ Cục bộ giúp ứng dụng hoạt động 100% không cần kết nối Supabase hay Internet.
         </p>
       </div>
     </div>

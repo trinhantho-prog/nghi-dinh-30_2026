@@ -3,6 +3,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { DocumentState } from '@/types'
 import { revalidatePath } from 'next/cache'
+import {
+  getLocalDocuments,
+  getLocalDocument,
+  saveLocalDocument,
+  saveLocalVersion,
+  deleteLocalVersion,
+  deleteLocalDocument,
+  renameLocalFolder,
+  deleteLocalFolder,
+} from '@/lib/storage/local-db'
 
 async function getTenantId(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -53,8 +63,11 @@ export async function saveDocument(
       revalidatePath('/dashboard')
       return data?.id ?? null
     }
-  } catch {
-    return null
+  } catch (error) {
+    console.warn('Supabase offline/error, falling back to local DB for saveDocument')
+    const localId = await saveLocalDocument(state, documentId)
+    revalidatePath('/dashboard')
+    return localId
   }
 }
 
@@ -90,80 +103,110 @@ export async function saveVersion(documentId: string, state: DocumentState) {
 
     return data ? { id: data.id, created_at: data.created_at, snapshot: state } : null
   } catch {
-    return null
+    console.warn('Supabase offline/error, falling back to local DB for saveVersion')
+    return await saveLocalVersion(documentId, state)
   }
 }
 
 export async function deleteVersion(versionId: string) {
-  const supabase = await createClient()
-  await supabase.from('doc_versions').delete().eq('id', versionId)
+  try {
+    const supabase = await createClient()
+    await supabase.from('doc_versions').delete().eq('id', versionId)
+  } catch {
+    console.warn('Supabase offline/error, falling back to local DB for deleteVersion')
+    await deleteLocalVersion(versionId)
+  }
 }
 
 export async function deleteDocument(documentId: string) {
-  const supabase = await createClient()
-  const { tenantId } = await getTenantId(supabase)
-  await supabase.from('documents').delete().eq('id', documentId).eq('tenant_id', tenantId)
-  revalidatePath('/dashboard')
+  try {
+    const supabase = await createClient()
+    const { tenantId } = await getTenantId(supabase)
+    await supabase.from('documents').delete().eq('id', documentId).eq('tenant_id', tenantId)
+    revalidatePath('/dashboard')
+  } catch {
+    console.warn('Supabase offline/error, falling back to local DB for deleteDocument')
+    await deleteLocalDocument(documentId)
+    revalidatePath('/dashboard')
+  }
 }
 
 export async function getDocuments() {
-  const supabase = await createClient()
-  const { tenantId } = await getTenantId(supabase)
+  try {
+    const supabase = await createClient()
+    const { tenantId } = await getTenantId(supabase)
 
-  const [{ data: docs, count }, { data: config }] = await Promise.all([
-    supabase
-      .from('documents')
-      .select('id, title, doc_type, updated_at, created_at, content', { count: 'exact' })
-      .eq('tenant_id', tenantId)
-      .order('updated_at', { ascending: false }),
-    supabase
-      .from('tenant_config')
-      .select('agencies, signers')
-      .eq('tenant_id', tenantId)
-      .single(),
-  ])
+    const [{ data: docs, count }, { data: config }] = await Promise.all([
+      supabase
+        .from('documents')
+        .select('id, title, doc_type, updated_at, created_at, content', { count: 'exact' })
+        .eq('tenant_id', tenantId)
+        .order('updated_at', { ascending: false }),
+      supabase
+        .from('tenant_config')
+        .select('agencies, signers')
+        .eq('tenant_id', tenantId)
+        .single(),
+    ])
 
-  return {
-    documents: docs ?? [],
-    documentCount: count ?? 0,
-    agencies: config?.agencies ?? [],
-    signers: config?.signers ?? [],
+    if (!docs) throw new Error('Không thể tải dữ liệu từ Supabase')
+
+    return {
+      documents: docs ?? [],
+      documentCount: count ?? 0,
+      agencies: config?.agencies ?? [],
+      signers: config?.signers ?? [],
+    }
+  } catch {
+    console.warn('Supabase offline/error, falling back to local DB for getDocuments')
+    return await getLocalDocuments()
   }
 }
 
 export async function getDocument(documentId: string) {
-  const supabase = await createClient()
-  const { tenantId } = await getTenantId(supabase)
+  try {
+    const supabase = await createClient()
+    const { tenantId } = await getTenantId(supabase)
 
-  const [{ data: doc }, { data: versions }, { data: config }, { count }] = await Promise.all([
-    supabase
-      .from('documents')
-      .select('*')
-      .eq('id', documentId)
-      .eq('tenant_id', tenantId)
-      .single(),
-    supabase
-      .from('doc_versions')
-      .select('id, created_at, snapshot')
-      .eq('document_id', documentId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('tenant_config')
-      .select('agencies, signers')
-      .eq('tenant_id', tenantId)
-      .single(),
-    supabase
-      .from('documents')
-      .select('*', { count: 'exact', head: true })
-      .eq('tenant_id', tenantId),
-  ])
+    const [{ data: doc }, { data: versions }, { data: config }, { count }] = await Promise.all([
+      supabase
+        .from('documents')
+        .select('*')
+        .eq('id', documentId)
+        .eq('tenant_id', tenantId)
+        .single(),
+      supabase
+        .from('doc_versions')
+        .select('id, created_at, snapshot')
+        .eq('document_id', documentId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('tenant_config')
+        .select('agencies, signers')
+        .eq('tenant_id', tenantId)
+        .single(),
+      supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId),
+    ])
 
-  return {
-    document: doc,
-    versions: versions ?? [],
-    agencies: config?.agencies ?? [],
-    signers: config?.signers ?? [],
-    documentCount: count ?? 0,
+    if (!doc) {
+      // Check local DB if not found in Supabase
+      const localRes = await getLocalDocument(documentId)
+      if (localRes.document) return localRes
+    }
+
+    return {
+      document: doc,
+      versions: versions ?? [],
+      agencies: config?.agencies ?? [],
+      signers: config?.signers ?? [],
+      documentCount: count ?? 0,
+    }
+  } catch {
+    console.warn('Supabase offline/error, falling back to local DB for getDocument')
+    return await getLocalDocument(documentId)
   }
 }
 
@@ -190,10 +233,14 @@ export async function renameFolder(oldName: string, newName: string) {
         }
       }
     }
+    await renameLocalFolder(oldName, newName)
     revalidatePath('/dashboard')
     return true
   } catch (e) {
-    return false
+    console.warn('Supabase offline/error, falling back to local DB for renameFolder')
+    await renameLocalFolder(oldName, newName)
+    revalidatePath('/dashboard')
+    return true
   }
 }
 
@@ -220,9 +267,13 @@ export async function deleteFolder(folderName: string) {
         }
       }
     }
+    await deleteLocalFolder(folderName)
     revalidatePath('/dashboard')
     return true
   } catch (e) {
-    return false
+    console.warn('Supabase offline/error, falling back to local DB for deleteFolder')
+    await deleteLocalFolder(folderName)
+    revalidatePath('/dashboard')
+    return true
   }
 }

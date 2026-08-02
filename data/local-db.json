@@ -1,0 +1,19 @@
+{
+  "documents": [],
+  "versions": [],
+  "config": {
+    "agencies": [
+      {
+        "upper": "BẢO HIỂM XÃ HỘI TỈNH ĐỒNG THÁP",
+        "main": "BẢO HIỂM XÃ HỘI CƠ SỞ CAO LÃNH",
+        "location": "Cao Lãnh"
+      }
+    ],
+    "signers": [
+      {
+        "position": "GIÁM ĐỐC",
+        "name": "Nguyễn Văn A"
+      }
+    ]
+  }
+}
