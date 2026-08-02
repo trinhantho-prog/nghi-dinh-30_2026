@@ -140,26 +140,39 @@ export async function getDocuments() {
     const supabase = await createClient()
     const { tenantId } = await getTenantId(supabase)
 
-    const [{ data: docs, count }, { data: config }] = await Promise.all([
-      supabase
-        .from('documents')
-        .select('id, title, doc_type, updated_at, created_at, content', { count: 'exact' })
-        .eq('tenant_id', tenantId)
-        .order('updated_at', { ascending: false }),
-      supabase
-        .from('tenant_config')
-        .select('agencies, signers')
-        .eq('tenant_id', tenantId)
-        .single(),
+    let docQuery = supabase
+      .from('documents')
+      .select('id, title, doc_type, updated_at, created_at, content', { count: 'exact' })
+      .order('updated_at', { ascending: false })
+
+    if (tenantId !== 'local_tenant') {
+      docQuery = docQuery.eq('tenant_id', tenantId)
+    }
+
+    const [{ data: docs }, { data: config }] = await Promise.all([
+      docQuery,
+      supabase.from('tenant_config').select('agencies, signers').limit(1).maybeSingle(),
     ])
 
-    if (!docs) throw new Error('Không thể tải dữ liệu từ Supabase')
+    const localRes = await getLocalDocuments()
+    const supabaseDocs = docs ?? []
+    const localDocs = localRes.documents ?? []
+
+    const docMap = new Map<string, any>()
+    supabaseDocs.forEach((d: any) => docMap.set(d.id, d))
+    localDocs.forEach((d: any) => {
+      if (!docMap.has(d.id)) docMap.set(d.id, d)
+    })
+
+    const combinedDocs = Array.from(docMap.values()).sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    )
 
     return {
-      documents: docs ?? [],
-      documentCount: count ?? 0,
-      agencies: config?.agencies ?? [],
-      signers: config?.signers ?? [],
+      documents: combinedDocs,
+      documentCount: combinedDocs.length,
+      agencies: config?.agencies?.length ? config.agencies : localRes.agencies,
+      signers: config?.signers?.length ? config.signers : localRes.signers,
     }
   } catch {
     console.warn('Supabase offline/error, falling back to local DB for getDocuments')
@@ -170,49 +183,46 @@ export async function getDocuments() {
 export async function getDocument(documentId: string) {
   try {
     const supabase = await createClient()
-    const { tenantId } = await getTenantId(supabase)
 
-    const [{ data: doc }, { data: versions }, { data: config }, { count }] = await Promise.all([
-      supabase
-        .from('documents')
-        .select('*')
-        .eq('id', documentId)
-        .eq('tenant_id', tenantId)
-        .single(),
+    const [{ data: doc }, { data: versions }, { data: config }] = await Promise.all([
+      supabase.from('documents').select('*').eq('id', documentId).maybeSingle(),
       supabase
         .from('doc_versions')
         .select('id, created_at, snapshot')
         .eq('document_id', documentId)
         .order('created_at', { ascending: false }),
-      supabase
-        .from('tenant_config')
-        .select('agencies, signers')
-        .eq('tenant_id', tenantId)
-        .single(),
-      supabase
-        .from('documents')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId),
+      supabase.from('tenant_config').select('agencies, signers').limit(1).maybeSingle(),
     ])
 
-    if (!doc) {
-      // Check local DB if not found in Supabase
-      const localRes = await getLocalDocument(documentId)
-      if (localRes.document) return localRes
+    const localRes = await getLocalDocument(documentId)
+
+    if (doc) {
+      return {
+        document: doc,
+        versions: versions && versions.length > 0 ? versions : localRes.versions ?? [],
+        agencies: config?.agencies?.length ? config.agencies : localRes.agencies,
+        signers: config?.signers?.length ? config.signers : localRes.signers,
+        documentCount: localRes.documentCount,
+      }
+    }
+
+    if (localRes.document) {
+      return localRes
     }
 
     return {
-      document: doc,
-      versions: versions ?? [],
-      agencies: config?.agencies ?? [],
-      signers: config?.signers ?? [],
-      documentCount: count ?? 0,
+      document: null,
+      versions: [],
+      agencies: localRes.agencies,
+      signers: localRes.signers,
+      documentCount: localRes.documentCount,
     }
   } catch {
     console.warn('Supabase offline/error, falling back to local DB for getDocument')
     return await getLocalDocument(documentId)
   }
 }
+
 
 export async function renameFolder(oldName: string, newName: string) {
   try {

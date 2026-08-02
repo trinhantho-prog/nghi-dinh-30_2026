@@ -48,13 +48,19 @@ export default function DocumentEditor({
     clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(async () => {
       const id = await saveDocument(state, currentDocIdRef.current)
-      if (id && !currentDocIdRef.current) {
-        currentDocIdRef.current = id
-        router.replace(`/documents/${id}`, { scroll: false })
+      if (id) {
+        try {
+          localStorage.setItem(`doc_${id}`, JSON.stringify(state))
+        } catch (e) {}
+        if (!currentDocIdRef.current) {
+          currentDocIdRef.current = id
+          router.replace(`/documents/${id}`, { scroll: false })
+        }
       }
     }, 1500)
     return () => clearTimeout(saveTimerRef.current)
   }, [state])
+
 
   function showToast(msg: string) {
     setToast(msg)
