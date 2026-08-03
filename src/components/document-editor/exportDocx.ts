@@ -143,10 +143,20 @@ function createMainContentElements(blocks: MainContentBlock[], fontSize = 28) {
   return elements
 }
 
+function getKtTitle(position: string): string {
+  if (!position || !/phó/i.test(position)) return ''
+  const headTitle = position
+    .replace(/^phó\s+/i, '')
+    .replace(/\bphó\b\s*/i, '')
+    .trim()
+    .toUpperCase()
+  return headTitle ? `KT. ${headTitle}` : ''
+}
+
 export async function exportDocx(state: DocumentState) {
   const isCongVan = state.docType === 'cong-van'
   const isBienBan = state.docType === 'bien-ban'
-  const isDeputy = /phó/i.test(state.signPosition)
+  const ktTitle = getKtTitle(state.signPosition)
   const bodyFontSize = isBienBan ? 26 : 28
   const mottoIndent = isBienBan ? 5.15 : 5.4
   const summaryIndent = isBienBan ? 6.0 : 6.25
@@ -446,8 +456,8 @@ export async function exportDocx(state: DocumentState) {
                 width: { size: 50, type: WidthType.PERCENTAGE },
                 borders: noBorder,
                 children: [
-                  ...(isDeputy ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                    new TextRun({ text: 'KT. GIÁM ĐỐC', font: 'Times New Roman', bold: true, size: 28 }),
+                  ...(ktTitle ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: ktTitle, font: 'Times New Roman', bold: true, size: 28 }),
                   ]})] : []),
                   new Paragraph({ alignment: AlignmentType.CENTER, children: [
                     new TextRun({ text: state.signPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),

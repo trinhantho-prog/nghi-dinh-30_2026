@@ -25,12 +25,7 @@ interface SidebarProps {
   onIssuesChange?: (issues: AIIssue[]) => void
 }
 
-const AGENCY_DEFAULTS: Record<string, { suffix: string; location: string }> = {
-  'BẢO HIỂM XÃ HỘI CƠ SỞ CAO LÃNH': { suffix: 'BHXH-CL', location: 'Cao Lãnh' },
-  'BẢO HIỂM XÃ HỘI CƠ SỞ THÁP MƯỜI': { suffix: 'BHXH-TM', location: 'Tháp Mười' },
-  'BẢO HIỂM XÃ HỘI CƠ SỞ TAM NÔNG': { suffix: 'BHXH-TN', location: 'Tam Nông' },
-  'BẢO HIỂM XÃ HỘI CƠ SỞ THANH BÌNH': { suffix: 'BHXH-TB', location: 'Thanh Bình' },
-}
+const AGENCY_DEFAULTS: Record<string, { suffix: string; location: string }> = {}
 
 const DOC_TYPE_OPTIONS: { value: DocType; label: string }[] = [
   { value: 'cong-van', label: 'Công Văn' },
@@ -56,16 +51,35 @@ export default function Sidebar({
     }
   }, [showHistory])
 
-  // Auto-fill docSymbol on mount when it's empty (new document)
+  // Auto-fill agency and docSymbol on mount or when agencies change
   useEffect(() => {
-    if (state.docSymbol || agencies.length === 0) return
+    if (agencies.length === 0) return
     const matched = agencies.find(a => a.main === state.agencyMain)
-    const hardcoded = AGENCY_DEFAULTS[state.agencyMain.toUpperCase().trim()]
-    const rawSuffix = matched?.suffix || hardcoded?.suffix
-    const suffix = rawSuffix ? rawSuffix.replace(/^\//, '') : ''
-    if (suffix) dispatch({ type: 'SET_FIELD', field: 'docSymbol', value: suffix })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agencies])
+    if (!matched && agencies[0]) {
+      dispatch({ type: 'SET_FIELD', field: 'agencyMain', value: agencies[0].main })
+      if (agencies[0].upper) dispatch({ type: 'SET_FIELD', field: 'agencyUpper', value: agencies[0].upper })
+      if (agencies[0].location) dispatch({ type: 'SET_FIELD', field: 'location', value: agencies[0].location })
+      const rawSuffix = agencies[0].suffix
+      const suffix = rawSuffix ? rawSuffix.replace(/^\//, '') : ''
+      dispatch({ type: 'SET_FIELD', field: 'docSymbol', value: suffix })
+    } else if (matched && !state.docSymbol && matched.suffix) {
+      const rawSuffix = matched.suffix
+      const suffix = rawSuffix ? rawSuffix.replace(/^\//, '') : ''
+      if (suffix) dispatch({ type: 'SET_FIELD', field: 'docSymbol', value: suffix })
+    }
+  }, [agencies, state.agencyMain])
+
+  // Auto-sync signer position & name when current signPosition is not present in signers list
+  useEffect(() => {
+    if (signers.length === 0) return
+    const matchedPosition = signers.some(s => s.position === state.signPosition)
+    if (!matchedPosition && signers[0]) {
+      dispatch({ type: 'SET_FIELD', field: 'signPosition', value: signers[0].position })
+      if (signers[0].name) {
+        dispatch({ type: 'SET_FIELD', field: 'signName', value: signers[0].name })
+      }
+    }
+  }, [signers, state.signPosition])
 
   const set = (field: keyof DocumentState) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -82,13 +96,12 @@ export default function Sidebar({
       dispatch({ type: 'SET_FIELD', field: 'agencyUpper', value: selectedAgency.upper })
     }
 
-    const hardcoded = AGENCY_DEFAULTS[value.toUpperCase().trim()]
-    const rawSuffix = selectedAgency?.suffix || hardcoded?.suffix
+    const rawSuffix = selectedAgency?.suffix
     const suffix = rawSuffix ? rawSuffix.replace(/^\//, '') : ''
-    const location = selectedAgency?.location || hardcoded?.location
+    const location = selectedAgency?.location
 
     if (location) dispatch({ type: 'SET_FIELD', field: 'location', value: location })
-    if (suffix) dispatch({ type: 'SET_FIELD', field: 'docSymbol', value: suffix })
+    dispatch({ type: 'SET_FIELD', field: 'docSymbol', value: suffix })
   }
 
   return (
@@ -120,10 +133,10 @@ export default function Sidebar({
               </Field>
               <div className="flex gap-2.5">
                 <Field label="Số" className="flex-1">
-                  <input value={state.docNumber} onChange={set('docNumber')} className={inputCls} placeholder="12" />
+                  <input value={state.docNumber} onChange={set('docNumber')} className={inputCls} placeholder="Số..." />
                 </Field>
                 <Field label="Ký hiệu" className="flex-1">
-                  <input value={state.docSymbol} onChange={set('docSymbol')} className={inputCls} placeholder="BHXH-CL" />
+                  <input value={state.docSymbol} onChange={set('docSymbol')} className={inputCls} placeholder="Ký hiệu..." />
                 </Field>
               </div>
               <Field label="Địa danh">

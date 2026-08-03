@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { saveLocalConfig, getLocalDocuments } from '@/lib/storage/local-db'
+import { saveTenantConfig, getDocuments } from '@/lib/actions/documents'
 import { Agency, Signer } from '@/types'
+import { revalidatePath } from 'next/cache'
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,10 +9,14 @@ export async function POST(req: NextRequest) {
     const agencies: Agency[] = body.agencies || []
     const signers: Signer[] = body.signers || []
 
-    await saveLocalConfig({ agencies, signers })
+    await saveTenantConfig(agencies, signers)
 
-    // Read back to confirm
-    const data = await getLocalDocuments()
+    revalidatePath('/settings')
+    revalidatePath('/documents/new')
+    revalidatePath('/dashboard')
+    revalidatePath('/', 'layout')
+
+    const data = await getDocuments()
 
     return NextResponse.json({
       success: true,

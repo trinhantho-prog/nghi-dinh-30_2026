@@ -4,15 +4,19 @@
   "config": {
     "agencies": [
       {
-        "upper": "BẢO HIỂM XÃ HỘI TỈNH ĐỒNG THÁP",
-        "main": "BẢO HIỂM XÃ HỘI CƠ SỞ CAO LÃNH",
+        "upper": "ỦY BAN NHÂN DÂN",
+        "main": "PHƯỜNG CAO LÃNH",
         "location": "Cao Lãnh"
       }
     ],
     "signers": [
       {
-        "position": "GIÁM ĐỐC",
-        "name": "Nguyễn Văn A"
+        "position": "CHỦ TỊCH",
+        "name": "Bùi Quốc Nam"
+      },
+      {
+        "position": "PHÓ CHỦ TỊCH",
+        "name": "Hồ Huệ Thu Hằng"
       }
     ]
   }

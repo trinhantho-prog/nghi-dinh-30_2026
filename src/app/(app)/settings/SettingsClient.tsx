@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Agency, Signer } from '@/types'
+import { useRouter } from 'next/navigation'
 
 interface Props {
   agencies: Agency[]
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function SettingsClient({ agencies: initAgencies, signers: initSigners, documentCount }: Props) {
+  const router = useRouter()
   const [agencies, setAgencies] = useState<Agency[]>(initAgencies)
   const [signers, setSigners] = useState<Signer[]>(initSigners)
   const [saving, setSaving] = useState(false)
@@ -35,6 +37,7 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
         setAgencies(data.agencies)
         setSigners(data.signers)
         showToast('Đã lưu cấu hình ✓')
+        router.refresh()
       } else {
         console.error('Save failed:', data.error)
         showToast('Có lỗi xảy ra khi lưu!')

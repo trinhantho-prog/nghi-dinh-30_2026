@@ -64,11 +64,21 @@ function renderHighlighted(text: string, words: string[], onDoubleClick?: (word:
   )
 }
 
+function getKtTitle(position: string): string {
+  if (!position || !/phó/i.test(position)) return ''
+  const headTitle = position
+    .replace(/^phó\s+/i, '')
+    .replace(/\bphó\b\s*/i, '')
+    .trim()
+    .toUpperCase()
+  return headTitle ? `KT. ${headTitle}` : ''
+}
+
 export default function A4Preview({ state, highlightWords = [], onWordDoubleClick }: A4PreviewProps) {
   const isCongVan = state.docType === 'cong-van'
   const isBienBan = state.docType === 'bien-ban'
   const docTypeTitle = DOC_TYPE_TITLES[state.docType]
-  const isDeputy = /phó/i.test(state.signPosition)
+  const ktTitle = getKtTitle(state.signPosition)
   const mainContentBlocks = getEffectiveMainContentBlocks(state)
 
   const formattedDate = state.date
@@ -282,8 +292,8 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           </div>
 
           <div style={{ width: '50%', textAlign: 'center' }}>
-            {isDeputy && (
-              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>KT. GIÁM ĐỐC</div>
+            {ktTitle && (
+              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>{ktTitle}</div>
             )}
             <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{state.signPosition}</div>
             <div style={{ height: '90px' }} />
