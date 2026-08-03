@@ -6,7 +6,7 @@ import { DocumentState, DEFAULT_DOCUMENT_STATE } from '@/types'
 type Action =
   | { type: 'SET_FIELD'; field: keyof DocumentState; value: string }
   | { type: 'LOAD'; state: DocumentState }
-  | { type: 'RESET' }
+  | { type: 'RESET'; initialConfig?: Partial<DocumentState> }
 
 function reducer(state: DocumentState, action: Action): DocumentState {
   switch (action.type) {
@@ -15,7 +15,7 @@ function reducer(state: DocumentState, action: Action): DocumentState {
     case 'LOAD':
       return { ...action.state }
     case 'RESET':
-      return { ...DEFAULT_DOCUMENT_STATE }
+      return { ...DEFAULT_DOCUMENT_STATE, ...action.initialConfig }
     default:
       return state
   }

@@ -34,7 +34,29 @@ export default function DocumentEditor({
   documentCount,
 }: DocumentEditorProps) {
   const router = useRouter()
-  const [state, dispatch] = useDocumentReducer(initialData)
+
+  const defaultAgency = agencies?.[0]
+  const defaultSigner = signers?.[0]
+
+  const defaultConfig: Partial<DocumentState> = {
+    ...(defaultAgency ? {
+      agencyUpper: defaultAgency.upper,
+      agencyMain: defaultAgency.main,
+      location: defaultAgency.location,
+      docSymbol: defaultAgency.suffix ? defaultAgency.suffix.replace(/^\//, '') : '',
+    } : {}),
+    ...(defaultSigner ? {
+      signPosition: defaultSigner.position,
+      signName: defaultSigner.name,
+    } : {}),
+  }
+
+  const mergedInitial = {
+    ...defaultConfig,
+    ...initialData,
+  }
+
+  const [state, dispatch] = useDocumentReducer(mergedInitial)
   const [versions, setVersions] = useState<DocVersion[]>(initialVersions)
   const [isSaving, setIsSaving] = useState(false)
   const [toast, setToast] = useState('')
@@ -167,7 +189,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
 
   function handleNewDocument() {
     currentDocIdRef.current = undefined
-    dispatch({ type: 'RESET' })
+    dispatch({ type: 'RESET', initialConfig: defaultConfig })
     setVersions([])
     router.push('/documents/new')
   }

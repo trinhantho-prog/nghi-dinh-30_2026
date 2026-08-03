@@ -41,11 +41,11 @@ export interface DocumentState {
 
 export const DEFAULT_DOCUMENT_STATE: DocumentState = {
   docType: 'cong-van',
-  agencyUpper: 'BẢO HIỂM XÃ HỘI TỈNH ĐỒNG THÁP',
-  agencyMain: 'BẢO HIỂM XÃ HỘI CƠ SỞ CAO LÃNH',
+  agencyUpper: '',
+  agencyMain: '',
   docNumber: '',
   docSymbol: '',
-  location: 'Cao Lãnh',
+  location: '',
   date: '',
   docSummary: '',
   recipient: '',
