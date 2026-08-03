@@ -310,24 +310,30 @@ export async function deleteFolder(folderName: string) {
 }
 
 export async function saveTenantConfig(agencies: Agency[], signers: Signer[]) {
+  console.log('[saveTenantConfig] Called with:', JSON.stringify({ agencies, signers }))
   try {
     const supabase = await createClient()
     const { tenantId } = await getTenantId(supabase)
+    console.log('[saveTenantConfig] tenantId:', tenantId)
     if (tenantId !== 'local_tenant') {
       const { error } = await supabase
         .from('tenant_config')
         .upsert({ tenant_id: tenantId, agencies, signers, updated_at: new Date().toISOString() })
       if (error) {
-        console.error('Error saving tenant_config to Supabase:', error)
+        console.error('[saveTenantConfig] Supabase error:', error)
       }
     }
   } catch (e) {
-    console.warn('Supabase offline/error, saving config to local DB:', e)
+    console.warn('[saveTenantConfig] Supabase offline/error:', e)
   }
+  console.log('[saveTenantConfig] Saving to local DB...')
   await saveLocalConfig({ agencies, signers })
+  console.log('[saveTenantConfig] Local DB saved. Revalidating paths...')
   revalidatePath('/dashboard')
   revalidatePath('/settings')
   revalidatePath('/documents/new')
+  console.log('[saveTenantConfig] Done.')
   return true
 }
+
 

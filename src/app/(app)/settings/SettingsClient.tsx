@@ -1,10 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { Agency, Signer } from '@/types'
-import { saveTenantConfig } from '@/lib/actions/documents'
-import { useRouter } from 'next/navigation'
 
 interface Props {
   agencies: Agency[]
@@ -13,19 +11,10 @@ interface Props {
 }
 
 export default function SettingsClient({ agencies: initAgencies, signers: initSigners, documentCount }: Props) {
-  const router = useRouter()
   const [agencies, setAgencies] = useState<Agency[]>(initAgencies)
   const [signers, setSigners] = useState<Signer[]>(initSigners)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
-
-  useEffect(() => {
-    setAgencies(initAgencies)
-  }, [initAgencies])
-
-  useEffect(() => {
-    setSigners(initSigners)
-  }, [initSigners])
 
   function showToast(msg: string) {
     setToast(msg)
@@ -35,9 +24,21 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
   async function saveConfig() {
     setSaving(true)
     try {
-      await saveTenantConfig(agencies, signers)
-      showToast('Đã lưu cấu hình ✓')
-      router.refresh()
+      const res = await fetch('/api/save-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agencies, signers }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        // Update state with confirmed saved data
+        setAgencies(data.agencies)
+        setSigners(data.signers)
+        showToast('Đã lưu cấu hình ✓')
+      } else {
+        console.error('Save failed:', data.error)
+        showToast('Có lỗi xảy ra khi lưu!')
+      }
     } catch (error) {
       console.error('Lỗi khi lưu cấu hình:', error)
       showToast('Có lỗi xảy ra khi lưu cấu hình!')
@@ -165,4 +166,5 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
 }
 
 const inputCls = 'w-full px-3 py-2 border-[1.5px] border-[#dde1ef] rounded-lg text-sm focus:outline-none focus:border-[#1a56b0] focus:ring-2 focus:ring-[#1a56b0]/10'
+
 
