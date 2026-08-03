@@ -149,12 +149,20 @@ export async function getDocuments() {
       docQuery = docQuery.eq('tenant_id', tenantId)
     }
 
-    const [{ data: docs }, { data: config }] = await Promise.all([
-      docQuery,
-      supabase.from('tenant_config').select('agencies, signers').limit(1).maybeSingle(),
-    ])
+    let config: { agencies?: Agency[]; signers?: Signer[] } | null = null
+    if (tenantId !== 'local_tenant') {
+      const { data } = await supabase
+        .from('tenant_config')
+        .select('agencies, signers')
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+      config = data
+    }
 
-    const localRes = await getLocalDocuments()
+    const [{ data: docs }, localRes] = await Promise.all([
+      docQuery,
+      getLocalDocuments(),
+    ])
     const supabaseDocs = docs ?? []
     const localDocs = localRes.documents ?? []
 
@@ -183,18 +191,27 @@ export async function getDocuments() {
 export async function getDocument(documentId: string) {
   try {
     const supabase = await createClient()
+    const { tenantId } = await getTenantId(supabase)
 
-    const [{ data: doc }, { data: versions }, { data: config }] = await Promise.all([
+    let config: { agencies?: Agency[]; signers?: Signer[] } | null = null
+    if (tenantId !== 'local_tenant') {
+      const { data } = await supabase
+        .from('tenant_config')
+        .select('agencies, signers')
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+      config = data
+    }
+
+    const [{ data: doc }, { data: versions }, localRes] = await Promise.all([
       supabase.from('documents').select('*').eq('id', documentId).maybeSingle(),
       supabase
         .from('doc_versions')
         .select('id, created_at, snapshot')
         .eq('document_id', documentId)
         .order('created_at', { ascending: false }),
-      supabase.from('tenant_config').select('agencies, signers').limit(1).maybeSingle(),
+      getLocalDocument(documentId),
     ])
-
-    const localRes = await getLocalDocument(documentId)
 
     if (doc) {
       return {
@@ -296,13 +313,21 @@ export async function saveTenantConfig(agencies: Agency[], signers: Signer[]) {
   try {
     const supabase = await createClient()
     const { tenantId } = await getTenantId(supabase)
-    await supabase.from('tenant_config').upsert({ tenant_id: tenantId, agencies, signers, updated_at: new Date().toISOString() })
+    if (tenantId !== 'local_tenant') {
+      const { error } = await supabase
+        .from('tenant_config')
+        .upsert({ tenant_id: tenantId, agencies, signers, updated_at: new Date().toISOString() })
+      if (error) {
+        console.error('Error saving tenant_config to Supabase:', error)
+      }
+    }
   } catch (e) {
-    console.warn('Supabase offline/error, saving config to local DB')
+    console.warn('Supabase offline/error, saving config to local DB:', e)
   }
   await saveLocalConfig({ agencies, signers })
   revalidatePath('/dashboard')
   revalidatePath('/settings')
+  revalidatePath('/documents/new')
   return true
 }
 

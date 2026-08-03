@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Agency, Signer } from '@/types'
 import { saveTenantConfig } from '@/lib/actions/documents'
@@ -19,6 +19,14 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
 
+  useEffect(() => {
+    setAgencies(initAgencies)
+  }, [initAgencies])
+
+  useEffect(() => {
+    setSigners(initSigners)
+  }, [initSigners])
+
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(''), 2500)
@@ -26,10 +34,16 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
 
   async function saveConfig() {
     setSaving(true)
-    await saveTenantConfig(agencies, signers)
-    setSaving(false)
-    showToast('Đã lưu cấu hình ✓')
-    router.refresh()
+    try {
+      await saveTenantConfig(agencies, signers)
+      showToast('Đã lưu cấu hình ✓')
+      router.refresh()
+    } catch (error) {
+      console.error('Lỗi khi lưu cấu hình:', error)
+      showToast('Có lỗi xảy ra khi lưu cấu hình!')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (

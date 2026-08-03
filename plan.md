@@ -131,3 +131,12 @@ Chân trang được chia làm 2 cột bằng bảng ẩn viền với tỷ lệ
 
 ---
 
+## 8. Quy tắc Tự động Đánh số trang (Page Numbering Rules)
+Hệ thống tự động thực thi quy định đánh số trang văn bản hành chính theo Phụ lục I Nghị định 30/2020/NĐ-CP:
+
+1. **Vị trí đánh số:** Đặt chính giữa, ở đầu trang văn bản (Header Center).
+2. **Ẩn số trang tại trang 1 (`titlePage: true`):** Trang đầu tiên của văn bản không đánh số trang (`headers.first` với mảng đoạn văn rỗng).
+3. **Đánh số từ trang 2 (`PageNumber.CURRENT`):** Từ trang thứ 2 trở đi, hệ thống tự động hiển thị số trang bằng chữ số Ả Rập, bắt đầu từ số **2** và tăng dần (`3`, `4`,...) ở đầu trang căn giữa, phông Times New Roman, cỡ 13pt-14pt (Word size 28).
+
+---
+
