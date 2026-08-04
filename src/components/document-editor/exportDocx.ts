@@ -39,6 +39,40 @@ const normalizeFreeText = (text: string): string => {
   return stripped ? `${stripped}.` : text
 }
 
+const parseRecipient = (recipient: string) => {
+  if (!recipient || !recipient.trim()) {
+    return { isMultiLine: false, firstLine: '', lines: [] }
+  }
+  const rawLines = recipient.split('\n').map(l => l.trim()).filter(Boolean)
+  if (rawLines.length <= 1) {
+    let text = rawLines[0] || ''
+    if (/^kính gửi:\s*/i.test(text)) {
+      text = text.replace(/^kính gửi:\s*/i, '').trim()
+    } else if (/^kính gửi\s*/i.test(text)) {
+      text = text.replace(/^kính gửi\s*/i, '').trim()
+    }
+    return { isMultiLine: false, firstLine: text, lines: [] }
+  }
+  let contentLines = [...rawLines]
+  if (/^kính gửi:?$/i.test(contentLines[0])) {
+    contentLines.shift()
+  } else if (/^kính gửi:\s*/i.test(contentLines[0])) {
+    contentLines[0] = contentLines[0].replace(/^kính gửi:\s*/i, '').trim()
+  }
+  if (contentLines.length === 1) {
+    return { isMultiLine: false, firstLine: contentLines[0], lines: [] }
+  }
+  const formattedLines = contentLines.map((line, idx) => {
+    let text = line.trim()
+    text = text.replace(/^[-\u2013\u2014•]\s*/, '')
+    text = text.replace(/[;,.]\s*$/, '')
+    const isLast = idx === contentLines.length - 1
+    const punc = isLast ? '.' : ';'
+    return `- ${text}${punc}`
+  })
+  return { isMultiLine: true, firstLine: '', lines: formattedLines }
+}
+
 const emptyLine = () => new Paragraph({ children: [new TextRun({ text: '', font: 'Times New Roman', size: 28 })] })
 const cmToTwip = (cm: number) => Math.round(convertInchesToTwip(cm / 2.54))
 
@@ -330,11 +364,35 @@ export async function exportDocx(state: DocumentState) {
 
         emptyLine(),
 
-        ...(isCongVan ? [
-          new Paragraph({ alignment: AlignmentType.CENTER, children: [
-            new TextRun({ text: `Kính gửi: ${state.recipient}`, font: 'Times New Roman', size: 28 }),
-          ]}),
-        ] : [
+        ...(isCongVan ? (() => {
+          const parsed = parseRecipient(state.recipient)
+          if (parsed.isMultiLine) {
+            return [
+              new Paragraph({
+                alignment: AlignmentType.LEFT,
+                spacing: { before: 120, after: 60, line: 360, lineRule: LineRuleType.EXACT },
+                children: [
+                  new TextRun({ text: 'Kính gửi:', font: 'Times New Roman', size: 28 }),
+                ],
+              }),
+              ...parsed.lines.map(line =>
+                new Paragraph({
+                  alignment: AlignmentType.LEFT,
+                  indent: { left: cmToTwip(2.5), hanging: cmToTwip(0.5) },
+                  spacing: { before: 0, after: 0, line: 360, lineRule: LineRuleType.EXACT },
+                  children: [
+                    new TextRun({ text: line, font: 'Times New Roman', size: 28 }),
+                  ],
+                })
+              ),
+            ]
+          }
+          return [
+            new Paragraph({ alignment: AlignmentType.CENTER, children: [
+              new TextRun({ text: `Kính gửi: ${parsed.firstLine || state.recipient || '...'}`, font: 'Times New Roman', size: 28 }),
+            ]}),
+          ]
+        })() : [
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [
             new TextRun({ text: DOC_TYPE_TITLES[state.docType] || '', font: 'Times New Roman', bold: true, size: 32, allCaps: true }),
           ]}),

@@ -166,7 +166,13 @@ export default function Sidebar({
             <textarea value={state.docSummary} onChange={set('docSummary')} rows={2} className={`${inputCls} resize-y`} />
           </Field>
           <Field label={state.docType === 'cong-van' ? 'Kính gửi' : 'Gửi đến (tùy chọn)'}>
-            <input value={state.recipient} onChange={set('recipient')} className={inputCls} />
+            <textarea
+              value={state.recipient}
+              onChange={set('recipient')}
+              rows={3}
+              className={`${inputCls} resize-y`}
+              placeholder={state.docType === 'cong-van' ? "Ví dụ:\n- Công an Phường;\n- Văn phòng HĐND&UBND Phường." : "Nhập nơi nhận..."}
+            />
           </Field>
         </section>
 

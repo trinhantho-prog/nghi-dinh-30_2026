@@ -42,6 +42,40 @@ const normalizeFreeText = (text: string): string => {
   return stripped ? `${stripped}.` : text
 }
 
+const parseRecipient = (recipient: string) => {
+  if (!recipient || !recipient.trim()) {
+    return { isMultiLine: false, firstLine: '', lines: [] }
+  }
+  const rawLines = recipient.split('\n').map(l => l.trim()).filter(Boolean)
+  if (rawLines.length <= 1) {
+    let text = rawLines[0] || ''
+    if (/^kính gửi:\s*/i.test(text)) {
+      text = text.replace(/^kính gửi:\s*/i, '').trim()
+    } else if (/^kính gửi\s*/i.test(text)) {
+      text = text.replace(/^kính gửi\s*/i, '').trim()
+    }
+    return { isMultiLine: false, firstLine: text, lines: [] }
+  }
+  let contentLines = [...rawLines]
+  if (/^kính gửi:?$/i.test(contentLines[0])) {
+    contentLines.shift()
+  } else if (/^kính gửi:\s*/i.test(contentLines[0])) {
+    contentLines[0] = contentLines[0].replace(/^kính gửi:\s*/i, '').trim()
+  }
+  if (contentLines.length === 1) {
+    return { isMultiLine: false, firstLine: contentLines[0], lines: [] }
+  }
+  const formattedLines = contentLines.map((line, idx) => {
+    let text = line.trim()
+    text = text.replace(/^[-\u2013\u2014•]\s*/, '')
+    text = text.replace(/[;,.]\s*$/, '')
+    const isLast = idx === contentLines.length - 1
+    const punc = isLast ? '.' : ';'
+    return `- ${text}${punc}`
+  })
+  return { isMultiLine: true, firstLine: '', lines: formattedLines }
+}
+
 interface A4PreviewProps {
   state: DocumentState
   highlightWords?: string[]
@@ -190,9 +224,28 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
 
       <div style={{ marginBottom: '0.9rem' }}>
         {isCongVan ? (
-          <div style={{ fontSize: '14pt', textAlign: 'center' }}>
-            Kính gửi: {state.recipient || '...'}
-          </div>
+          (() => {
+            const parsed = parseRecipient(state.recipient)
+            if (parsed.isMultiLine) {
+              return (
+                <div style={{ fontSize: '14pt', textAlign: 'left', lineHeight: '1.45' }}>
+                  <div style={{ marginBottom: '2pt' }}>Kính gửi:</div>
+                  <div style={{ paddingLeft: '2.5cm' }}>
+                    {parsed.lines.map((line, i) => (
+                      <div key={i} style={{ textIndent: '-0.5cm', paddingLeft: '0.5cm', whiteSpace: 'pre-wrap' }}>
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            }
+            return (
+              <div style={{ fontSize: '14pt', textAlign: 'center' }}>
+                Kính gửi: {parsed.firstLine || '...'}
+              </div>
+            )
+          })()
         ) : (
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '16pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
