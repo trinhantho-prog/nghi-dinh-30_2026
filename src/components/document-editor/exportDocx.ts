@@ -143,6 +143,22 @@ function createMainContentElements(blocks: MainContentBlock[], fontSize = 28) {
   return elements
 }
 
+function getTmTitle(agencyUpper: string): string {
+  if (!agencyUpper || !agencyUpper.trim()) return ''
+  const upper = agencyUpper.trim().toUpperCase()
+  if (/^TM\./i.test(upper)) return upper
+  if (
+    upper.includes('ỦY BAN') ||
+    upper.includes('HỘI ĐỒNG') ||
+    upper.includes('BAN CHẤP HÀNH') ||
+    upper.includes('BAN THƯỜNG VỤ') ||
+    upper.includes('HỘI ')
+  ) {
+    return `TM. ${upper}`
+  }
+  return ''
+}
+
 function getKtTitle(position: string): string {
   if (!position || !/phó/i.test(position)) return ''
   const headTitle = position
@@ -156,6 +172,7 @@ function getKtTitle(position: string): string {
 export async function exportDocx(state: DocumentState) {
   const isCongVan = state.docType === 'cong-van'
   const isBienBan = state.docType === 'bien-ban'
+  const tmTitle = getTmTitle(state.agencyUpper)
   const ktTitle = getKtTitle(state.signPosition)
   const bodyFontSize = isBienBan ? 26 : 28
   const mottoIndent = isBienBan ? 5.15 : 5.4
@@ -456,6 +473,9 @@ export async function exportDocx(state: DocumentState) {
                 width: { size: 50, type: WidthType.PERCENTAGE },
                 borders: noBorder,
                 children: [
+                  ...(tmTitle ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: tmTitle, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                  ]})] : []),
                   ...(ktTitle ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
                     new TextRun({ text: ktTitle, font: 'Times New Roman', bold: true, size: 28 }),
                   ]})] : []),

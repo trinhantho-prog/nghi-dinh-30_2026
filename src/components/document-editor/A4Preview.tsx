@@ -64,6 +64,22 @@ function renderHighlighted(text: string, words: string[], onDoubleClick?: (word:
   )
 }
 
+function getTmTitle(agencyUpper: string): string {
+  if (!agencyUpper || !agencyUpper.trim()) return ''
+  const upper = agencyUpper.trim().toUpperCase()
+  if (/^TM\./i.test(upper)) return upper
+  if (
+    upper.includes('ỦY BAN') ||
+    upper.includes('HỘI ĐỒNG') ||
+    upper.includes('BAN CHẤP HÀNH') ||
+    upper.includes('BAN THƯỜNG VỤ') ||
+    upper.includes('HỘI ')
+  ) {
+    return `TM. ${upper}`
+  }
+  return ''
+}
+
 function getKtTitle(position: string): string {
   if (!position || !/phó/i.test(position)) return ''
   const headTitle = position
@@ -78,6 +94,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
   const isCongVan = state.docType === 'cong-van'
   const isBienBan = state.docType === 'bien-ban'
   const docTypeTitle = DOC_TYPE_TITLES[state.docType]
+  const tmTitle = getTmTitle(state.agencyUpper)
   const ktTitle = getKtTitle(state.signPosition)
   const mainContentBlocks = getEffectiveMainContentBlocks(state)
 
@@ -292,6 +309,9 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           </div>
 
           <div style={{ width: '50%', textAlign: 'center' }}>
+            {tmTitle && (
+              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>{tmTitle}</div>
+            )}
             {ktTitle && (
               <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>{ktTitle}</div>
             )}

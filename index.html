@@ -1002,11 +1002,28 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('preview-conclusion').textContent = fields.conclusion.value;
 
         // Signature
+        const getTmTitle = (agencyUpper) => {
+            if (!agencyUpper || !agencyUpper.trim()) return '';
+            const upper = agencyUpper.trim().toUpperCase();
+            if (/^TM\./i.test(upper)) return upper;
+            if (upper.includes('ỦY BAN') || upper.includes('HỘI ĐỒNG') || upper.includes('BAN CHẤP HÀNH') || upper.includes('BAN THƯỜNG VỤ') || upper.includes('HỘI ')) {
+                return `TM. ${upper}`;
+            }
+            return '';
+        };
+
         const pos = fields.signPosition.value || 'GIÁM ĐỐC';
         const name = fields.signName.value || '';
+        const agencyUpper = fields.agencyUpper ? fields.agencyUpper.value : '';
         let sigHtml = '';
+        const tmTitle = getTmTitle(agencyUpper);
+        if (tmTitle) {
+            sigHtml += `<div class="sign-position" style="font-size:13pt;">${tmTitle}</div>`;
+        }
         if (pos.trim().toUpperCase() === 'PHÓ GIÁM ĐỐC') {
             sigHtml += '<div class="sign-position" style="font-size:13pt;">KT. GIÁM ĐỐC</div>';
+        } else if (pos.trim().toUpperCase() === 'PHÓ CHỦ TỊCH') {
+            sigHtml += '<div class="sign-position" style="font-size:13pt;">KT. CHỦ TỊCH</div>';
         }
         sigHtml += `<div class="sign-position">${pos}</div>`;
         sigHtml += '<div class="signature-space"></div>';
@@ -1265,9 +1282,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const pos = fields.signPosition.value || 'GIÁM ĐỐC';
             const name = fields.signName.value || '';
+            const agencyUpper = fields.agencyUpper ? fields.agencyUpper.value : '';
             const sigBlocks = [];
+            const tmTitle = getTmTitle(agencyUpper);
+            if (tmTitle) {
+                sigBlocks.push(mkPara(tmTitle, { align: AlignmentType.CENTER, size: 28, bold: true }));
+            }
             if (pos.trim().toUpperCase() === 'PHÓ GIÁM ĐỐC')
                 sigBlocks.push(mkPara('KT. GIÁM ĐỐC', { align: AlignmentType.CENTER, size: 28, bold: true }));
+            else if (pos.trim().toUpperCase() === 'PHÓ CHỦ TỊCH')
+                sigBlocks.push(mkPara('KT. CHỦ TỊCH', { align: AlignmentType.CENTER, size: 28, bold: true }));
             sigBlocks.push(mkPara(pos, { align: AlignmentType.CENTER, size: 28, bold: true }));
             for (let i = 0; i < 6; i++) sigBlocks.push(emptyLine());
             sigBlocks.push(mkPara(name, { align: AlignmentType.CENTER, size: 28, bold: true }));
