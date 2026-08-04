@@ -370,6 +370,7 @@ export async function exportDocx(state: DocumentState) {
             return [
               new Paragraph({
                 alignment: AlignmentType.LEFT,
+                indent: { left: cmToTwip(5.5) },
                 spacing: { before: 120, after: 60, line: 360, lineRule: LineRuleType.EXACT },
                 children: [
                   new TextRun({ text: 'Kính gửi:', font: 'Times New Roman', size: 28 }),
@@ -378,7 +379,7 @@ export async function exportDocx(state: DocumentState) {
               ...parsed.lines.map(line =>
                 new Paragraph({
                   alignment: AlignmentType.LEFT,
-                  indent: { left: cmToTwip(2.5), hanging: cmToTwip(0.5) },
+                  indent: { left: cmToTwip(7.7), hanging: cmToTwip(0.5) },
                   spacing: { before: 0, after: 0, line: 360, lineRule: LineRuleType.EXACT },
                   children: [
                     new TextRun({ text: line, font: 'Times New Roman', size: 28 }),
@@ -388,9 +389,14 @@ export async function exportDocx(state: DocumentState) {
             ]
           }
           return [
-            new Paragraph({ alignment: AlignmentType.CENTER, children: [
-              new TextRun({ text: `Kính gửi: ${parsed.firstLine || state.recipient || '...'}`, font: 'Times New Roman', size: 28 }),
-            ]}),
+            new Paragraph({
+              alignment: AlignmentType.LEFT,
+              indent: { left: cmToTwip(5.5) },
+              spacing: { before: 120, after: 120, line: 360, lineRule: LineRuleType.EXACT },
+              children: [
+                new TextRun({ text: `Kính gửi: ${parsed.firstLine || state.recipient || '...'}`, font: 'Times New Roman', size: 28 }),
+              ],
+            }),
           ]
         })() : [
           new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [

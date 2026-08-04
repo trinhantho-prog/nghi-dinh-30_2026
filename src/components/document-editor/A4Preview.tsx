@@ -228,9 +228,9 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
             const parsed = parseRecipient(state.recipient)
             if (parsed.isMultiLine) {
               return (
-                <div style={{ fontSize: '14pt', textAlign: 'left', lineHeight: '1.45' }}>
+                <div style={{ fontSize: '14pt', textAlign: 'left', lineHeight: '1.45', paddingLeft: '5.5cm' }}>
                   <div style={{ marginBottom: '2pt' }}>Kính gửi:</div>
-                  <div style={{ paddingLeft: '2.5cm' }}>
+                  <div style={{ paddingLeft: '2.2cm' }}>
                     {parsed.lines.map((line, i) => (
                       <div key={i} style={{ textIndent: '-0.5cm', paddingLeft: '0.5cm', whiteSpace: 'pre-wrap' }}>
                         {line}
@@ -241,7 +241,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
               )
             }
             return (
-              <div style={{ fontSize: '14pt', textAlign: 'center' }}>
+              <div style={{ fontSize: '14pt', textAlign: 'left', paddingLeft: '5.5cm' }}>
                 Kính gửi: {parsed.firstLine || '...'}
               </div>
             )
