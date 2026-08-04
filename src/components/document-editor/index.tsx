@@ -90,21 +90,41 @@ export default function DocumentEditor({
   }
 
   async function handleSaveVersion() {
-    if (!currentDocIdRef.current) {
-      showToast('Lưu văn bản trước khi tạo phiên bản')
-      return
-    }
-    if (versions.length >= 99) {
-      showToast('Đã đạt giới hạn 99 phiên bản')
-      return
-    }
     setIsSaving(true)
     try {
-      const newVersion = await saveVersion(currentDocIdRef.current, state)
+      // 1. Always save the document first so it persists in DB (Supabase / local DB)
+      const id = await saveDocument(state, currentDocIdRef.current)
+      if (id) {
+        currentDocIdRef.current = id
+        try {
+          localStorage.setItem(`doc_${id}`, JSON.stringify(state))
+        } catch (e) {}
+        if (!documentId) {
+          router.replace(`/documents/${id}`, { scroll: false })
+        }
+      }
+
+      const activeDocId = id || currentDocIdRef.current
+      if (!activeDocId) {
+        showToast('Không thể lưu văn bản')
+        return
+      }
+
+      if (versions.length >= 99) {
+        showToast('Đã lưu văn bản. Đạt giới hạn 99 phiên bản.')
+        return
+      }
+
+      // 2. Save version snapshot
+      const newVersion = await saveVersion(activeDocId, state)
       if (newVersion) {
         setVersions(prev => [newVersion, ...prev])
-        showToast('Đã lưu phiên bản ✓')
+        showToast('Đã lưu văn bản & phiên bản ✓')
+      } else {
+        showToast('Đã lưu văn bản ✓')
       }
+    } catch (e) {
+      showToast('Có lỗi khi lưu phiên bản')
     } finally {
       setIsSaving(false)
     }

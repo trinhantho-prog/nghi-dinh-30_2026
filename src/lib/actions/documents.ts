@@ -43,32 +43,38 @@ export async function saveDocument(
     const title = state.docSummary || state.docNumber || 'Văn bản chưa đặt tên'
 
     if (documentId) {
-      await supabase
+      const { error } = await supabase
         .from('documents')
         .update({ title, doc_type: state.docType, content: state, updated_at: new Date().toISOString() })
         .eq('id', documentId)
         .eq('tenant_id', tenantId)
+
+      if (error) throw error
+      revalidatePath('/dashboard')
       return documentId
     } else {
       // Check limit
-      const { count } = await supabase
+      const { count, error: countError } = await supabase
         .from('documents')
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
 
+      if (countError) throw countError
       if ((count ?? 0) >= 1000) throw new Error('Đã đạt giới hạn 1000 văn bản')
 
-      const { data } = await supabase
+      const { data, error: insertError } = await supabase
         .from('documents')
         .insert({ tenant_id: tenantId, title, doc_type: state.docType, content: state, created_by: userId })
         .select('id')
         .single()
 
+      if (insertError) throw insertError
+
       revalidatePath('/dashboard')
       return data?.id ?? null
     }
   } catch (error) {
-    console.warn('Supabase offline/error, falling back to local DB for saveDocument')
+    console.warn('Supabase offline/error, falling back to local DB for saveDocument:', error)
     const localId = await saveLocalDocument(state, documentId)
     revalidatePath('/dashboard')
     return localId
@@ -81,10 +87,12 @@ export async function saveVersion(documentId: string, state: DocumentState) {
     const { tenantId } = await getTenantId(supabase)
 
     // Check version limit
-    const { count } = await supabase
+    const { count, error: countError } = await supabase
       .from('doc_versions')
       .select('*', { count: 'exact', head: true })
       .eq('document_id', documentId)
+
+    if (countError) throw countError
 
     if ((count ?? 0) >= 99) {
       // Delete oldest version
@@ -99,15 +107,17 @@ export async function saveVersion(documentId: string, state: DocumentState) {
       if (oldest) await supabase.from('doc_versions').delete().eq('id', oldest.id)
     }
 
-    const { data } = await supabase
+    const { data, error: insertError } = await supabase
       .from('doc_versions')
       .insert({ document_id: documentId, snapshot: state })
       .select('id, created_at')
       .single()
 
+    if (insertError) throw insertError
+
     return data ? { id: data.id, created_at: data.created_at, snapshot: state } : null
-  } catch {
-    console.warn('Supabase offline/error, falling back to local DB for saveVersion')
+  } catch (error) {
+    console.warn('Supabase offline/error, falling back to local DB for saveVersion:', error)
     return await saveLocalVersion(documentId, state)
   }
 }
@@ -115,7 +125,8 @@ export async function saveVersion(documentId: string, state: DocumentState) {
 export async function deleteVersion(versionId: string) {
   try {
     const supabase = await createClient()
-    await supabase.from('doc_versions').delete().eq('id', versionId)
+    const { error } = await supabase.from('doc_versions').delete().eq('id', versionId)
+    if (error) throw error
   } catch {
     console.warn('Supabase offline/error, falling back to local DB for deleteVersion')
     await deleteLocalVersion(versionId)
@@ -126,7 +137,8 @@ export async function deleteDocument(documentId: string) {
   try {
     const supabase = await createClient()
     const { tenantId } = await getTenantId(supabase)
-    await supabase.from('documents').delete().eq('id', documentId).eq('tenant_id', tenantId)
+    const { error } = await supabase.from('documents').delete().eq('id', documentId).eq('tenant_id', tenantId)
+    if (error) throw error
     revalidatePath('/dashboard')
   } catch {
     console.warn('Supabase offline/error, falling back to local DB for deleteDocument')
@@ -159,10 +171,12 @@ export async function getDocuments() {
       config = data
     }
 
-    const [{ data: docs }, localRes] = await Promise.all([
+    const [{ data: docs, error: docError }, localRes] = await Promise.all([
       docQuery,
       getLocalDocuments(),
     ])
+    if (docError) throw docError
+
     const supabaseDocs = docs ?? []
     const localDocs = localRes.documents ?? []
 
@@ -182,8 +196,8 @@ export async function getDocuments() {
       agencies: config?.agencies?.length ? config.agencies : localRes.agencies,
       signers: config?.signers?.length ? config.signers : localRes.signers,
     }
-  } catch {
-    console.warn('Supabase offline/error, falling back to local DB for getDocuments')
+  } catch (error) {
+    console.warn('Supabase offline/error, falling back to local DB for getDocuments:', error)
     return await getLocalDocuments()
   }
 }
@@ -203,7 +217,7 @@ export async function getDocument(documentId: string) {
       config = data
     }
 
-    const [{ data: doc }, { data: versions }, localRes] = await Promise.all([
+    const [{ data: doc, error: docErr }, { data: versions, error: verErr }, localRes] = await Promise.all([
       supabase.from('documents').select('*').eq('id', documentId).maybeSingle(),
       supabase
         .from('doc_versions')
@@ -212,6 +226,8 @@ export async function getDocument(documentId: string) {
         .order('created_at', { ascending: false }),
       getLocalDocument(documentId),
     ])
+
+    if (docErr) throw docErr
 
     if (doc) {
       return {
@@ -234,8 +250,8 @@ export async function getDocument(documentId: string) {
       signers: localRes.signers,
       documentCount: localRes.documentCount,
     }
-  } catch {
-    console.warn('Supabase offline/error, falling back to local DB for getDocument')
+  } catch (error) {
+    console.warn('Supabase offline/error, falling back to local DB for getDocument:', error)
     return await getLocalDocument(documentId)
   }
 }
@@ -247,10 +263,12 @@ export async function renameFolder(oldName: string, newName: string) {
     const { tenantId } = await getTenantId(supabase)
 
     // Fetch all documents in the old folder
-    const { data: docs } = await supabase
+    const { data: docs, error } = await supabase
       .from('documents')
       .select('id, content')
       .eq('tenant_id', tenantId)
+
+    if (error) throw error
 
     if (docs) {
       for (const doc of docs) {
@@ -281,10 +299,12 @@ export async function deleteFolder(folderName: string) {
     const { tenantId } = await getTenantId(supabase)
 
     // Fetch all documents in the folder
-    const { data: docs } = await supabase
+    const { data: docs, error } = await supabase
       .from('documents')
       .select('id, content')
       .eq('tenant_id', tenantId)
+
+    if (error) throw error
 
     if (docs) {
       for (const doc of docs) {
@@ -335,5 +355,6 @@ export async function saveTenantConfig(agencies: Agency[], signers: Signer[]) {
   console.log('[saveTenantConfig] Done.')
   return true
 }
+
 
 
