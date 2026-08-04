@@ -376,7 +376,7 @@
             text-align: center;
         }
 
-        .agency-upper { font-size: 12pt; text-transform: uppercase; }
+        .agency-upper { font-size: 12pt; text-transform: uppercase; font-weight: bold; }
 
         .agency-main {
             font-size: 12pt;
@@ -1193,7 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         width: { size: 48, type: WidthType.PERCENTAGE },
                         borders: noBorder,
                         children: [
-                            mkPara(fields.agencyUpper.value || 'CƠ QUAN CHỦ QUẢN', { align: AlignmentType.CENTER, size: 24, tight: true, characterSpacing: -5 }),
+                            mkPara(fields.agencyUpper.value || 'CƠ QUAN CHỦ QUẢN', { align: AlignmentType.CENTER, size: 24, bold: true, tight: true, characterSpacing: -5 }),
                             mkPara(fields.agencyMain.value  || 'CƠ QUAN BAN HÀNH',  { align: AlignmentType.CENTER, size: 24, bold: true, tight: true, characterSpacing: -5 }),
                             mkPara('_______________________', { align: AlignmentType.CENTER, size: 16, bold: true, isLine: true }),
                             emptyLine(),

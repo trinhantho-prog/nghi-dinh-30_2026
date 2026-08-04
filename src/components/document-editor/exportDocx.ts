@@ -208,11 +208,8 @@ function createMainContentElements(blocks: MainContentBlock[], fontSize = 28) {
   return elements
 }
 
-function getTmTitle(agencyUpper: string, signPosition?: string): string {
+function getTmTitle(agencyUpper: string): string {
   if (!agencyUpper || !agencyUpper.trim()) return ''
-  if (signPosition && /^chủ tịch$/i.test(signPosition.trim())) {
-    return ''
-  }
   const upper = agencyUpper.trim().toUpperCase()
   if (/^TM\./i.test(upper)) return upper
   if (
@@ -240,7 +237,7 @@ function getKtTitle(position: string): string {
 export async function exportDocx(state: DocumentState) {
   const isCongVan = state.docType === 'cong-van'
   const isBienBan = state.docType === 'bien-ban'
-  const tmTitle = getTmTitle(state.agencyUpper, state.signPosition)
+  const tmTitle = getTmTitle(state.agencyUpper)
   const ktTitle = getKtTitle(state.signPosition)
   const bodyFontSize = isBienBan ? 26 : 28
   const mottoIndent = isBienBan ? 5.15 : 5.4
@@ -360,7 +357,7 @@ export async function exportDocx(state: DocumentState) {
                 borders: noBorder,
                 children: [
                   new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                    new TextRun({ text: state.agencyUpper, font: 'Times New Roman', size: 24, allCaps: true }),
+                    new TextRun({ text: state.agencyUpper, font: 'Times New Roman', bold: true, size: 24, allCaps: true }),
                   ]}),
                   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [
                     new TextRun({ text: state.agencyMain, font: 'Times New Roman', bold: true, size: 24, allCaps: true, characterSpacing: -20 }),

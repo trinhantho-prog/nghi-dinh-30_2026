@@ -118,11 +118,8 @@ function renderHighlighted(text: string, words: string[], onDoubleClick?: (word:
   )
 }
 
-function getTmTitle(agencyUpper: string, signPosition?: string): string {
+function getTmTitle(agencyUpper: string): string {
   if (!agencyUpper || !agencyUpper.trim()) return ''
-  if (signPosition && /^chủ tịch$/i.test(signPosition.trim())) {
-    return ''
-  }
   const upper = agencyUpper.trim().toUpperCase()
   if (/^TM\./i.test(upper)) return upper
   if (
@@ -224,7 +221,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.8rem' }}>
           <div style={{ width: '48%', textAlign: 'center' }}>
-            <div style={{ fontSize: '12pt', textTransform: 'uppercase' }}>{state.agencyUpper}</div>
+            <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase' }}>{state.agencyUpper}</div>
             <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>
               {state.agencyMain}
             </div>
