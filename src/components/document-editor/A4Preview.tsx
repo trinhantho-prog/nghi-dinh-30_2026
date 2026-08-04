@@ -118,8 +118,11 @@ function renderHighlighted(text: string, words: string[], onDoubleClick?: (word:
   )
 }
 
-function getTmTitle(agencyUpper: string): string {
+function getTmTitle(agencyUpper: string, signPosition?: string): string {
   if (!agencyUpper || !agencyUpper.trim()) return ''
+  if (signPosition && /^chủ tịch$/i.test(signPosition.trim())) {
+    return ''
+  }
   const upper = agencyUpper.trim().toUpperCase()
   if (/^TM\./i.test(upper)) return upper
   if (

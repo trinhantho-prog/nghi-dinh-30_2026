@@ -208,8 +208,11 @@ function createMainContentElements(blocks: MainContentBlock[], fontSize = 28) {
   return elements
 }
 
-function getTmTitle(agencyUpper: string): string {
+function getTmTitle(agencyUpper: string, signPosition?: string): string {
   if (!agencyUpper || !agencyUpper.trim()) return ''
+  if (signPosition && /^chủ tịch$/i.test(signPosition.trim())) {
+    return ''
+  }
   const upper = agencyUpper.trim().toUpperCase()
   if (/^TM\./i.test(upper)) return upper
   if (
@@ -237,7 +240,7 @@ function getKtTitle(position: string): string {
 export async function exportDocx(state: DocumentState) {
   const isCongVan = state.docType === 'cong-van'
   const isBienBan = state.docType === 'bien-ban'
-  const tmTitle = getTmTitle(state.agencyUpper)
+  const tmTitle = getTmTitle(state.agencyUpper, state.signPosition)
   const ktTitle = getKtTitle(state.signPosition)
   const bodyFontSize = isBienBan ? 26 : 28
   const mottoIndent = isBienBan ? 5.15 : 5.4
