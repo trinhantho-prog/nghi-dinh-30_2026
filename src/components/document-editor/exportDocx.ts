@@ -39,6 +39,26 @@ const normalizeFreeText = (text: string): string => {
   return stripped ? `${stripped}.` : text
 }
 
+// Chuẩn hóa đoạn văn kết luận: tự động kết thúc bằng dấu "./." ở cuối
+const normalizeConclusion = (text: string): string => {
+  if (!text || !text.trim()) return text
+  const lines = text.split('\n')
+  return lines
+    .map((line, idx) => {
+      const trimmed = line.trim()
+      if (!trimmed) return ''
+      if (isHeadingLine(trimmed)) {
+        return trimmed.replace(/([.;:/]|\.\/\.)+\s*$/, '').trim()
+      }
+      const isLastLine = idx === lines.length - 1
+      const cleaned = trimmed.replace(/([.;:/]|\.\/\.)+\s*$/, '').trim()
+      if (!cleaned) return ''
+      return isLastLine ? `${cleaned}./.` : `${cleaned}.`
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
 const parseRecipient = (recipient: string) => {
   if (!recipient || !recipient.trim()) {
     return { isMultiLine: false, firstLine: '', lines: [] }
@@ -111,6 +131,17 @@ function isHeadingLine(line: string): boolean {
 
 function createBodyParagraph(text: string, bold = false, fontSize = 28, isFreeText = false) {
   const normalizedText = isFreeText ? normalizeFreeText(text) : normalizeBodyText(text)
+  return new Paragraph({
+    alignment: AlignmentType.BOTH,
+    contextualSpacing: false,
+    indent: { firstLine: cmToTwip(1.27), left: 0 },
+    spacing: { before: 120, after: 120, line: 360, lineRule: LineRuleType.EXACT },
+    children: [new TextRun({ text: normalizedText, font: 'Times New Roman', size: fontSize, bold })],
+  })
+}
+
+function createConclusionParagraph(text: string, bold = false, fontSize = 28) {
+  const normalizedText = normalizeConclusion(text)
   return new Paragraph({
     alignment: AlignmentType.BOTH,
     contextualSpacing: false,
@@ -221,8 +252,22 @@ export async function exportDocx(state: DocumentState) {
       })()
     : `${state.location}, ngày ... tháng ... năm ...`
 
+  const parseRecipientsCcLines = (text: string): string[] => {
+    if (!text || !text.trim()) return []
+    const rawLines = text.split('\n').map(l => l.trim()).filter(Boolean)
+    return rawLines.map((line, idx) => {
+      let t = line.trim()
+      if (!/^[-\u2013\u2014•]\s*/.test(t)) {
+        t = `- ${t}`
+      }
+      const stripped = t.replace(/[;,.]\s*$/, '').trim()
+      const isLast = idx === rawLines.length - 1
+      return isLast ? `${stripped}.` : `${stripped};`
+    })
+  }
+
   const legalBasisLines = state.legalBasis.split('\n').map(l => l.trim()).filter(Boolean)
-  const recipientsCcLines = state.recipientsCc.split('\n').map(l => l.trim()).filter(Boolean)
+  const recipientsCcLines = parseRecipientsCcLines(state.recipientsCc)
   const mainContentBlocks = getEffectiveMainContentBlocks(state)
 
   const doc = new Document({
@@ -426,8 +471,8 @@ export async function exportDocx(state: DocumentState) {
 
         ...createMainContentElements(mainContentBlocks, bodyFontSize),
 
-        // Kết luận/yêu cầu: luôn kết thúc bằng dấu "."
-        ...(state.conclusion ? [createBodyParagraph(state.conclusion, isHeadingLine(state.conclusion), bodyFontSize, true)] : []),
+        // Kết luận/yêu cầu: luôn tự động kết thúc bằng dấu "./."
+        ...(state.conclusion ? [createConclusionParagraph(state.conclusion, isHeadingLine(state.conclusion), bodyFontSize)] : []),
 
         emptyLine(),
 

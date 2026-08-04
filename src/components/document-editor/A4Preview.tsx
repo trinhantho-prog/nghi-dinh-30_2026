@@ -42,6 +42,26 @@ const normalizeFreeText = (text: string): string => {
   return stripped ? `${stripped}.` : text
 }
 
+// Chuẩn hóa đoạn văn kết luận: tự động kết thúc bằng dấu "./." ở cuối
+const normalizeConclusion = (text: string): string => {
+  if (!text || !text.trim()) return text
+  const lines = text.split('\n')
+  return lines
+    .map((line, idx) => {
+      const trimmed = line.trim()
+      if (!trimmed) return ''
+      if (isHeadingLine(trimmed)) {
+        return trimmed.replace(/([.;:/]|\.\/\.)+\s*$/, '').trim()
+      }
+      const isLastLine = idx === lines.length - 1
+      const cleaned = trimmed.replace(/([.;:/]|\.\/\.)+\s*$/, '').trim()
+      if (!cleaned) return ''
+      return isLastLine ? `${cleaned}./.` : `${cleaned}.`
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
 const parseRecipient = (recipient: string) => {
   if (!recipient || !recipient.trim()) {
     return { isMultiLine: false, firstLine: '', lines: [] }
@@ -146,10 +166,21 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
     .map(l => l.trim())
     .filter(Boolean)
 
-  const recipientsCcLines = state.recipientsCc
-    .split('\n')
-    .map(l => l.trim())
-    .filter(Boolean)
+  const parseRecipientsCcLines = (text: string): string[] => {
+    if (!text || !text.trim()) return []
+    const rawLines = text.split('\n').map(l => l.trim()).filter(Boolean)
+    return rawLines.map((line, idx) => {
+      let t = line.trim()
+      if (!/^[-\u2013\u2014•]\s*/.test(t)) {
+        t = `- ${t}`
+      }
+      const stripped = t.replace(/[;,.]\s*$/, '').trim()
+      const isLast = idx === rawLines.length - 1
+      return isLast ? `${stripped}.` : `${stripped};`
+    })
+  }
+
+  const recipientsCcLines = parseRecipientsCcLines(state.recipientsCc)
 
   const bodyStyle: React.CSSProperties = {
     marginTop: '6pt',
@@ -313,10 +344,10 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           </div>
         )}
 
-        {/* Kết luận/Yêu cầu: luôn kết thúc bằng dấu "." */}
+        {/* Kết luận/Yêu cầu: luôn tự động kết thúc bằng dấu "./." */}
         {state.conclusion && (
           <div style={{ ...bodyStyle, ...(isHeadingLine(state.conclusion) ? { fontWeight: 'bold' } : {}) }}>
-            {renderHighlighted(normalizeFreeText(state.conclusion), highlightWords, onWordDoubleClick)}
+            {renderHighlighted(normalizeConclusion(state.conclusion), highlightWords, onWordDoubleClick)}
           </div>
         )}
       </div>
