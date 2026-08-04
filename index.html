@@ -1196,9 +1196,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             mkPara(fields.agencyUpper.value || 'CƠ QUAN CHỦ QUẢN', { align: AlignmentType.CENTER, size: 24, bold: true, tight: true, characterSpacing: -5 }),
                             mkPara(fields.agencyMain.value  || 'CƠ QUAN BAN HÀNH',  { align: AlignmentType.CENTER, size: 24, bold: true, tight: true, characterSpacing: -5 }),
                             mkPara('_______________________', { align: AlignmentType.CENTER, size: 16, bold: true, isLine: true }),
-                            emptyLine(),
-                            mkPara(fields.docNumber.value ? `Số: ${fields.docNumber.value}` : 'Số: .../BHXH-...', { align: AlignmentType.CENTER, size: 26 }),
-                            ...(fields.docType.value === 'cong-van' ? [mkPara(`V/v ${fields.docSummary.value || '...'}`, { align: AlignmentType.CENTER, size: 26 })] : [])
+                            mkPara(fields.docNumber.value ? `Số: ${fields.docNumber.value}` : 'Số: .../BHXH-...', { align: AlignmentType.CENTER, size: 26, tight: true }),
+                            ...(fields.docType.value === 'cong-van' ? [mkPara(`V/v ${fields.docSummary.value || '...'}`, { align: AlignmentType.CENTER, size: 26, tight: true })] : [])
                         ]
                     }),
                     new TableCell({
@@ -1208,8 +1207,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             mkPara('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', { align: AlignmentType.CENTER, size: 24, bold: true, tight: true, characterSpacing: -5 }),
                             mkPara('Độc lập - Tự do - Hạnh phúc', { align: AlignmentType.CENTER, size: 26, bold: true, tight: true }),
                             mkPara('______________________________________', { align: AlignmentType.CENTER, size: 16, bold: true, isLine: true }),
-                            emptyLine(),
-                            mkPara(`${fields.location.value || '...'}, ${formatDate(fields.date.value)}`, { align: AlignmentType.CENTER, size: 28, italics: true })
+                            mkPara(`${fields.location.value || '...'}, ${formatDate(fields.date.value)}`, { align: AlignmentType.CENTER, size: 28, italics: true, tight: true })
                         ]
                     })
                 ]})]

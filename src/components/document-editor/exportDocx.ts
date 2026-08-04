@@ -368,14 +368,13 @@ export async function exportDocx(state: DocumentState) {
                     spacing: { before: 0, after: 0, line: 20, lineRule: LineRuleType.EXACT },
                     children: [new TextRun({ text: '', font: 'Times New Roman', size: 2 })],
                   }),
-                  emptyLine(),
-                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 60, after: 0 }, children: [
                     new TextRun({
                       text: `Số: ${state.docSymbol ? `${state.docNumber || '   '}/${state.docSymbol}` : (state.docNumber || '...')}`,
                       font: 'Times New Roman', size: 26,
                     }),
                   ]}),
-                  ...(isCongVan ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  ...(isCongVan ? [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [
                     new TextRun({ text: `V/v ${state.docSummary}`, font: 'Times New Roman', size: 26 }),
                   ]})] : []),
                 ],
@@ -397,8 +396,7 @@ export async function exportDocx(state: DocumentState) {
                     spacing: { before: 0, after: 0, line: 20, lineRule: LineRuleType.EXACT },
                     children: [new TextRun({ text: '', font: 'Times New Roman', size: 2 })],
                   }),
-                  emptyLine(),
-                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 60, after: 0 }, children: [
                     new TextRun({ text: formattedDate, font: 'Times New Roman', italics: true, size: 28 }),
                   ]}),
                 ],
