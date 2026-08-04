@@ -175,7 +175,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
 
       if (!res.ok) {
         const err = await res.json()
-        throw new Error(err.error || 'Có lỗi khi chạy AI Copilot')
+        throw new Error(err.error || 'Có lỗi khi chạy AI Nâng cấp Nội dung')
       }
 
       const data = await res.json()
@@ -249,7 +249,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
             <div className="p-4 bg-[#f8fafc] border-t border-[#c8d0e8] shrink-0 space-y-3 shadow-inner">
               <div className="flex items-center gap-1.5 text-[#1e293b]">
                 <span className="text-sm">⚡</span>
-                <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">AI Copilot - Nâng cấp Nội dung</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#475569]">AI Nâng cấp Nội dung</span>
               </div>
               
               <div className="flex gap-2">
