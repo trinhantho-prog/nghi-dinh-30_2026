@@ -29,7 +29,11 @@ export default function DocumentPageClient({
   documentCount,
 }: Props) {
   const [documentData, setDocumentData] = useState<DocumentState | null>(
-    initialDocument?.content ? (initialDocument.content as DocumentState) : null
+    initialDocument?.content
+      ? (initialDocument.content as DocumentState)
+      : initialDocument
+      ? (initialDocument as DocumentState)
+      : null
   )
   const [loading, setLoading] = useState(!initialDocument)
 

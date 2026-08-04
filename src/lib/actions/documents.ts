@@ -15,6 +15,13 @@ import {
   saveLocalConfig,
 } from '@/lib/storage/local-db'
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isUUID(str?: string | null): boolean {
+  if (!str) return false
+  return UUID_REGEX.test(str)
+}
+
 async function getTenantId(supabase: Awaited<ReturnType<typeof createClient>>) {
   try {
     const { data: { user } } = await supabase.auth.getUser()
@@ -25,156 +32,158 @@ async function getTenantId(supabase: Awaited<ReturnType<typeof createClient>>) {
         .eq('user_id', user.id)
         .single()
 
-      if (data) return { tenantId: data.tenant_id, userId: user.id }
+      if (data && isUUID(data.tenant_id)) return { tenantId: data.tenant_id, userId: user.id }
     }
   } catch (e) {}
   return { tenantId: 'local_tenant', userId: 'local_user' }
 }
 
-
 export async function saveDocument(
   state: DocumentState,
   documentId?: string
 ): Promise<string | null> {
+  // 1. Always save to local DB first to guarantee persistence
+  const localId = await saveLocalDocument(state, documentId)
+  const activeId = documentId || localId || `doc_${Date.now()}`
+
   try {
     const supabase = await createClient()
     const { tenantId, userId } = await getTenantId(supabase)
 
+    if (tenantId === 'local_tenant' || !isUUID(tenantId)) {
+      revalidatePath('/dashboard')
+      return activeId
+    }
+
     const title = state.docSummary || state.docNumber || 'Văn bản chưa đặt tên'
 
-    if (documentId) {
-      const { error } = await supabase
+    if (activeId && isUUID(activeId)) {
+      const { data, error } = await supabase
         .from('documents')
         .update({ title, doc_type: state.docType, content: state, updated_at: new Date().toISOString() })
-        .eq('id', documentId)
+        .eq('id', activeId)
         .eq('tenant_id', tenantId)
-
-      if (error) throw error
-      revalidatePath('/dashboard')
-      return documentId
-    } else {
-      // Check limit
-      const { count, error: countError } = await supabase
-        .from('documents')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-
-      if (countError) throw countError
-      if ((count ?? 0) >= 1000) throw new Error('Đã đạt giới hạn 1000 văn bản')
-
-      const { data, error: insertError } = await supabase
-        .from('documents')
-        .insert({ tenant_id: tenantId, title, doc_type: state.docType, content: state, created_by: userId })
         .select('id')
-        .single()
 
-      if (insertError) throw insertError
+      if (!error && data && data.length > 0) {
+        revalidatePath('/dashboard')
+        return activeId
+      }
+    }
 
+    // Insert new document into Supabase if it's not in Supabase yet
+    const { data, error: insertError } = await supabase
+      .from('documents')
+      .insert({ tenant_id: tenantId, title, doc_type: state.docType, content: state, created_by: userId })
+      .select('id')
+      .single()
+
+    if (!insertError && data?.id) {
+      await saveLocalDocument(state, data.id)
       revalidatePath('/dashboard')
-      return data?.id ?? null
+      return data.id
     }
   } catch (error) {
-    console.warn('Supabase offline/error, falling back to local DB for saveDocument:', error)
-    const localId = await saveLocalDocument(state, documentId)
-    revalidatePath('/dashboard')
-    return localId
+    console.warn('Supabase offline/error, using local DB for saveDocument:', error)
   }
+
+  revalidatePath('/dashboard')
+  return activeId
 }
 
 export async function saveVersion(documentId: string, state: DocumentState) {
-  try {
-    const supabase = await createClient()
-    const { tenantId } = await getTenantId(supabase)
+  const localVer = await saveLocalVersion(documentId, state)
+  if (isUUID(documentId)) {
+    try {
+      const supabase = await createClient()
+      const { tenantId } = await getTenantId(supabase)
 
-    // Check version limit
-    const { count, error: countError } = await supabase
-      .from('doc_versions')
-      .select('*', { count: 'exact', head: true })
-      .eq('document_id', documentId)
+      if (tenantId !== 'local_tenant' && isUUID(tenantId)) {
+        const { count } = await supabase
+          .from('doc_versions')
+          .select('*', { count: 'exact', head: true })
+          .eq('document_id', documentId)
 
-    if (countError) throw countError
+        if ((count ?? 0) >= 99) {
+          const { data: oldest } = await supabase
+            .from('doc_versions')
+            .select('id')
+            .eq('document_id', documentId)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .single()
 
-    if ((count ?? 0) >= 99) {
-      // Delete oldest version
-      const { data: oldest } = await supabase
-        .from('doc_versions')
-        .select('id')
-        .eq('document_id', documentId)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .single()
+          if (oldest) await supabase.from('doc_versions').delete().eq('id', oldest.id)
+        }
 
-      if (oldest) await supabase.from('doc_versions').delete().eq('id', oldest.id)
+        const { data } = await supabase
+          .from('doc_versions')
+          .insert({ document_id: documentId, snapshot: state })
+          .select('id, created_at')
+          .single()
+
+        if (data) {
+          return { id: data.id, created_at: data.created_at, snapshot: state }
+        }
+      }
+    } catch (error) {
+      console.warn('Supabase offline/error, using local DB for saveVersion:', error)
     }
-
-    const { data, error: insertError } = await supabase
-      .from('doc_versions')
-      .insert({ document_id: documentId, snapshot: state })
-      .select('id, created_at')
-      .single()
-
-    if (insertError) throw insertError
-
-    return data ? { id: data.id, created_at: data.created_at, snapshot: state } : null
-  } catch (error) {
-    console.warn('Supabase offline/error, falling back to local DB for saveVersion:', error)
-    return await saveLocalVersion(documentId, state)
   }
+  return localVer
 }
 
 export async function deleteVersion(versionId: string) {
-  try {
-    const supabase = await createClient()
-    const { error } = await supabase.from('doc_versions').delete().eq('id', versionId)
-    if (error) throw error
-  } catch {
-    console.warn('Supabase offline/error, falling back to local DB for deleteVersion')
-    await deleteLocalVersion(versionId)
+  await deleteLocalVersion(versionId)
+  if (isUUID(versionId)) {
+    try {
+      const supabase = await createClient()
+      await supabase.from('doc_versions').delete().eq('id', versionId)
+    } catch (e) {
+      console.warn('Supabase offline/error during deleteVersion:', e)
+    }
   }
 }
 
 export async function deleteDocument(documentId: string) {
-  try {
-    const supabase = await createClient()
-    const { tenantId } = await getTenantId(supabase)
-    const { error } = await supabase.from('documents').delete().eq('id', documentId).eq('tenant_id', tenantId)
-    if (error) throw error
-    revalidatePath('/dashboard')
-  } catch {
-    console.warn('Supabase offline/error, falling back to local DB for deleteDocument')
-    await deleteLocalDocument(documentId)
-    revalidatePath('/dashboard')
+  await deleteLocalDocument(documentId)
+  if (isUUID(documentId)) {
+    try {
+      const supabase = await createClient()
+      const { tenantId } = await getTenantId(supabase)
+      if (tenantId !== 'local_tenant' && isUUID(tenantId)) {
+        await supabase.from('documents').delete().eq('id', documentId).eq('tenant_id', tenantId)
+      }
+    } catch (e) {
+      console.warn('Supabase offline/error during deleteDocument:', e)
+    }
   }
+  revalidatePath('/dashboard')
 }
 
 export async function getDocuments() {
+  const localRes = await getLocalDocuments()
   try {
     const supabase = await createClient()
     const { tenantId } = await getTenantId(supabase)
 
-    let docQuery = supabase
-      .from('documents')
-      .select('id, title, doc_type, updated_at, created_at, content', { count: 'exact' })
-      .order('updated_at', { ascending: false })
-
-    if (tenantId !== 'local_tenant') {
-      docQuery = docQuery.eq('tenant_id', tenantId)
+    if (tenantId === 'local_tenant' || !isUUID(tenantId)) {
+      return localRes
     }
 
-    let config: { agencies?: Agency[]; signers?: Signer[] } | null = null
-    if (tenantId !== 'local_tenant') {
-      const { data } = await supabase
+    const [{ data: docs, error: docError }, configRes] = await Promise.all([
+      supabase
+        .from('documents')
+        .select('id, title, doc_type, updated_at, created_at, content')
+        .eq('tenant_id', tenantId)
+        .order('updated_at', { ascending: false }),
+      supabase
         .from('tenant_config')
         .select('agencies, signers')
         .eq('tenant_id', tenantId)
-        .maybeSingle()
-      config = data
-    }
-
-    const [{ data: docs, error: docError }, localRes] = await Promise.all([
-      docQuery,
-      getLocalDocuments(),
+        .maybeSingle(),
     ])
+
     if (docError) throw docError
 
     const supabaseDocs = docs ?? []
@@ -190,6 +199,7 @@ export async function getDocuments() {
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     )
 
+    const config = configRes.data
     return {
       documents: combinedDocs,
       documentCount: combinedDocs.length,
@@ -198,17 +208,23 @@ export async function getDocuments() {
     }
   } catch (error) {
     console.warn('Supabase offline/error, falling back to local DB for getDocuments:', error)
-    return await getLocalDocuments()
+    return localRes
   }
 }
 
 export async function getDocument(documentId: string) {
+  const localRes = await getLocalDocument(documentId)
+
+  if (!isUUID(documentId)) {
+    return localRes
+  }
+
   try {
     const supabase = await createClient()
     const { tenantId } = await getTenantId(supabase)
 
     let config: { agencies?: Agency[]; signers?: Signer[] } | null = null
-    if (tenantId !== 'local_tenant') {
+    if (tenantId !== 'local_tenant' && isUUID(tenantId)) {
       const { data } = await supabase
         .from('tenant_config')
         .select('agencies, signers')
@@ -217,14 +233,13 @@ export async function getDocument(documentId: string) {
       config = data
     }
 
-    const [{ data: doc, error: docErr }, { data: versions, error: verErr }, localRes] = await Promise.all([
+    const [{ data: doc, error: docErr }, { data: versions, error: verErr }] = await Promise.all([
       supabase.from('documents').select('*').eq('id', documentId).maybeSingle(),
       supabase
         .from('doc_versions')
         .select('id, created_at, snapshot')
         .eq('document_id', documentId)
         .order('created_at', { ascending: false }),
-      getLocalDocument(documentId),
     ])
 
     if (docErr) throw docErr
@@ -252,90 +267,81 @@ export async function getDocument(documentId: string) {
     }
   } catch (error) {
     console.warn('Supabase offline/error, falling back to local DB for getDocument:', error)
-    return await getLocalDocument(documentId)
+    return localRes
   }
 }
 
-
 export async function renameFolder(oldName: string, newName: string) {
+  await renameLocalFolder(oldName, newName)
   try {
     const supabase = await createClient()
     const { tenantId } = await getTenantId(supabase)
 
-    // Fetch all documents in the old folder
-    const { data: docs, error } = await supabase
-      .from('documents')
-      .select('id, content')
-      .eq('tenant_id', tenantId)
+    if (tenantId !== 'local_tenant' && isUUID(tenantId)) {
+      const { data: docs, error } = await supabase
+        .from('documents')
+        .select('id, content')
+        .eq('tenant_id', tenantId)
 
-    if (error) throw error
-
-    if (docs) {
-      for (const doc of docs) {
-        const content = doc.content as any
-        if (content && content.folder?.trim() === oldName.trim()) {
-          const updatedContent = { ...content, folder: newName.trim() }
-          await supabase
-            .from('documents')
-            .update({ content: updatedContent, updated_at: new Date().toISOString() })
-            .eq('id', doc.id)
+      if (docs && !error) {
+        for (const doc of docs) {
+          const content = doc.content as any
+          if (content && content.folder?.trim() === oldName.trim()) {
+            const updatedContent = { ...content, folder: newName.trim() }
+            await supabase
+              .from('documents')
+              .update({ content: updatedContent, updated_at: new Date().toISOString() })
+              .eq('id', doc.id)
+          }
         }
       }
     }
-    await renameLocalFolder(oldName, newName)
-    revalidatePath('/dashboard')
-    return true
   } catch (e) {
-    console.warn('Supabase offline/error, falling back to local DB for renameFolder')
-    await renameLocalFolder(oldName, newName)
-    revalidatePath('/dashboard')
-    return true
+    console.warn('Supabase offline/error, using local DB for renameFolder:', e)
   }
+  revalidatePath('/dashboard')
+  return true
 }
 
 export async function deleteFolder(folderName: string) {
+  await deleteLocalFolder(folderName)
   try {
     const supabase = await createClient()
     const { tenantId } = await getTenantId(supabase)
 
-    // Fetch all documents in the folder
-    const { data: docs, error } = await supabase
-      .from('documents')
-      .select('id, content')
-      .eq('tenant_id', tenantId)
+    if (tenantId !== 'local_tenant' && isUUID(tenantId)) {
+      const { data: docs, error } = await supabase
+        .from('documents')
+        .select('id, content')
+        .eq('tenant_id', tenantId)
 
-    if (error) throw error
-
-    if (docs) {
-      for (const doc of docs) {
-        const content = doc.content as any
-        if (content && content.folder?.trim() === folderName.trim()) {
-          const updatedContent = { ...content, folder: '' }
-          await supabase
-            .from('documents')
-            .update({ content: updatedContent, updated_at: new Date().toISOString() })
-            .eq('id', doc.id)
+      if (docs && !error) {
+        for (const doc of docs) {
+          const content = doc.content as any
+          if (content && content.folder?.trim() === folderName.trim()) {
+            const updatedContent = { ...content, folder: '' }
+            await supabase
+              .from('documents')
+              .update({ content: updatedContent, updated_at: new Date().toISOString() })
+              .eq('id', doc.id)
+          }
         }
       }
     }
-    await deleteLocalFolder(folderName)
-    revalidatePath('/dashboard')
-    return true
   } catch (e) {
-    console.warn('Supabase offline/error, falling back to local DB for deleteFolder')
-    await deleteLocalFolder(folderName)
-    revalidatePath('/dashboard')
-    return true
+    console.warn('Supabase offline/error, using local DB for deleteFolder:', e)
   }
+  revalidatePath('/dashboard')
+  return true
 }
 
 export async function saveTenantConfig(agencies: Agency[], signers: Signer[]) {
   console.log('[saveTenantConfig] Called with:', JSON.stringify({ agencies, signers }))
+  await saveLocalConfig({ agencies, signers })
   try {
     const supabase = await createClient()
     const { tenantId } = await getTenantId(supabase)
-    console.log('[saveTenantConfig] tenantId:', tenantId)
-    if (tenantId !== 'local_tenant') {
+    if (tenantId !== 'local_tenant' && isUUID(tenantId)) {
       const { error } = await supabase
         .from('tenant_config')
         .upsert({ tenant_id: tenantId, agencies, signers, updated_at: new Date().toISOString() })
@@ -346,13 +352,9 @@ export async function saveTenantConfig(agencies: Agency[], signers: Signer[]) {
   } catch (e) {
     console.warn('[saveTenantConfig] Supabase offline/error:', e)
   }
-  console.log('[saveTenantConfig] Saving to local DB...')
-  await saveLocalConfig({ agencies, signers })
-  console.log('[saveTenantConfig] Local DB saved. Revalidating paths...')
   revalidatePath('/dashboard')
   revalidatePath('/settings')
   revalidatePath('/documents/new')
-  console.log('[saveTenantConfig] Done.')
   return true
 }
 

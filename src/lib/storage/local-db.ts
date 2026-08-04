@@ -4,6 +4,7 @@ import { DocumentState, DocType, Agency, Signer } from '@/types'
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 const DB_FILE = path.join(DATA_DIR, 'local-db.json')
+const TMP_FILE = path.join(DATA_DIR, 'local-db.json.tmp')
 
 export interface LocalDocumentRecord {
   id: string
@@ -50,29 +51,38 @@ const DEFAULT_CONFIG: LocalTenantConfigRecord = {
   ],
 }
 
+let memoryDB: LocalDBData | null = null
+
 function ensureDBFile(): LocalDBData {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true })
     }
     if (!fs.existsSync(DB_FILE)) {
+      if (memoryDB) return memoryDB
       const initialData: LocalDBData = {
         documents: [],
         versions: [],
         config: DEFAULT_CONFIG,
       }
-      fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8')
+      saveDBFile(initialData)
       return initialData
     }
     const content = fs.readFileSync(DB_FILE, 'utf-8')
-    const parsed = JSON.parse(content)
-    return {
-      documents: parsed.documents || [],
-      versions: parsed.versions || [],
-      config: parsed.config || DEFAULT_CONFIG,
+    if (!content.trim()) {
+      if (memoryDB) return memoryDB
     }
+    const parsed = JSON.parse(content)
+    const validData: LocalDBData = {
+      documents: Array.isArray(parsed.documents) ? parsed.documents : (memoryDB?.documents || []),
+      versions: Array.isArray(parsed.versions) ? parsed.versions : (memoryDB?.versions || []),
+      config: parsed.config || memoryDB?.config || DEFAULT_CONFIG,
+    }
+    memoryDB = validData
+    return validData
   } catch (error) {
     console.error('Error reading local DB:', error)
+    if (memoryDB) return memoryDB
     return {
       documents: [],
       versions: [],
@@ -86,7 +96,14 @@ function saveDBFile(data: LocalDBData) {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true })
     }
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8')
+    memoryDB = data
+    const jsonStr = JSON.stringify(data, null, 2)
+    fs.writeFileSync(TMP_FILE, jsonStr, 'utf-8')
+    try {
+      fs.renameSync(TMP_FILE, DB_FILE)
+    } catch (renameErr) {
+      fs.writeFileSync(DB_FILE, jsonStr, 'utf-8')
+    }
   } catch (error) {
     console.error('Error saving local DB:', error)
   }
