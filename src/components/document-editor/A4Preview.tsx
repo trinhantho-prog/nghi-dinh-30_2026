@@ -2,6 +2,11 @@
 
 import { DocumentState } from '@/types'
 import { getEffectiveMainContentBlocks } from './mainContentBlocks'
+import { normalizeColumnWidths } from './tableSizing'
+import { signatureAuthorityLines } from '@/lib/document-signature'
+import { tableCellLayout, tableFontScale } from '@/lib/table-layout'
+import { documentImageSize } from '@/lib/document-image'
+import SourceDocumentPreview from './SourceDocumentPreview'
 
 const DOC_TYPE_TITLES: Record<string, string> = {
   'bao-cao': 'BÁO CÁO',
@@ -76,7 +81,7 @@ const parseRecipient = (recipient: string) => {
     }
     return { isMultiLine: false, firstLine: text, lines: [] }
   }
-  let contentLines = [...rawLines]
+  const contentLines = [...rawLines]
   if (/^kính gửi:?$/i.test(contentLines[0])) {
     contentLines.shift()
   } else if (/^kính gửi:\s*/i.test(contentLines[0])) {
@@ -118,38 +123,12 @@ function renderHighlighted(text: string, words: string[], onDoubleClick?: (word:
   )
 }
 
-function getTmTitle(agencyUpper: string): string {
-  if (!agencyUpper || !agencyUpper.trim()) return ''
-  const upper = agencyUpper.trim().toUpperCase()
-  if (/^TM\./i.test(upper)) return upper
-  if (
-    upper.includes('ỦY BAN') ||
-    upper.includes('HỘI ĐỒNG') ||
-    upper.includes('BAN CHẤP HÀNH') ||
-    upper.includes('BAN THƯỜNG VỤ') ||
-    upper.includes('HỘI ')
-  ) {
-    return `TM. ${upper}`
-  }
-  return ''
-}
-
-function getKtTitle(position: string): string {
-  if (!position || !/phó/i.test(position)) return ''
-  const headTitle = position
-    .replace(/^phó\s+/i, '')
-    .replace(/\bphó\b\s*/i, '')
-    .trim()
-    .toUpperCase()
-  return headTitle ? `KT. ${headTitle}` : ''
-}
-
 export default function A4Preview({ state, highlightWords = [], onWordDoubleClick }: A4PreviewProps) {
+  if (state.sourceLayout) return <SourceDocumentPreview state={state} />
   const isCongVan = state.docType === 'cong-van'
   const isBienBan = state.docType === 'bien-ban'
   const docTypeTitle = DOC_TYPE_TITLES[state.docType]
-  const tmTitle = getTmTitle(state.agencyUpper)
-  const ktTitle = getKtTitle(state.signPosition)
+  const authorityLines = signatureAuthorityLines(state)
   const mainContentBlocks = getEffectiveMainContentBlocks(state)
 
   const formattedDate = state.date
@@ -159,7 +138,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
         const month = String(d.getMonth() + 1).padStart(2, '0')
         return `${state.location}, ngày ${day} tháng ${month} năm ${d.getFullYear()}`
       })()
-    : `${state.location}, ngày ... tháng ... năm ...`
+    : `${state.location}, ${state.dateText || 'ngày ... tháng ... năm ...'}`
 
   const legalBasisLines = state.legalBasis
     .split('\n')
@@ -314,30 +293,45 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
         {mainContentBlocks.length > 0 && (
           <div>
             {mainContentBlocks.map((block, i) =>
-              block.type === 'table' ? (
+              block.type === 'image' ? (
+                <div key={i} style={{ margin: '6pt 0', textAlign: block.align || 'center', textIndent: 0 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={block.src} alt={block.alt} style={{ width: `${documentImageSize(block, (isBienBan ? 160 : 165) * 96 / 25.4).width}px`, maxWidth: '100%', height: 'auto', display: 'inline-block', verticalAlign: 'middle' }} />
+                </div>
+              ) : block.type === 'table' ? (
                 // Bảng từ Excel: không có khoảng trống trên/dưới (margin=0)
                 <table
                   key={i}
-                  style={{ width: '100%', borderCollapse: 'collapse', margin: '0', textIndent: 0 }}
+                  style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', margin: '0', textIndent: 0 }}
                 >
+                  <colgroup>{normalizeColumnWidths(block.columnWidths, block.rows[0]?.length || 0).map((width, column) => <col key={column} style={{ width: `${width}%` }} />)}</colgroup>
                   <tbody>
                     {block.rows.map((row, rowIndex) => (
                       <tr key={rowIndex}>
-                        {row.map((cell, cellIndex) => (
+                        {row.map((cell, cellIndex) => {
+                          const layout = tableCellLayout(block, rowIndex, cellIndex)
+                          if (layout.hidden) return null
+                          const scale = tableFontScale(block, (isBienBan ? 160 : 165) * 96 / 25.4)
+                          return (
                           <td
                             key={cellIndex}
-                            style={{ border: '1px solid #000', padding: '4pt 6pt', verticalAlign: 'top', textAlign: 'left' }}
+                            rowSpan={layout.rowSpan} colSpan={layout.colSpan}
+                            style={{ border: block.borderless ? 'none' : '1px solid #000', padding: block.fontSize ? '1pt 2pt' : '4pt 6pt', verticalAlign: layout.style.verticalAlign || (block.fontSize ? 'middle' : 'top'), textAlign: layout.style.align || 'left', whiteSpace: 'pre-wrap', fontSize: `${Math.max(6, (layout.style.fontSize || block.fontSize || (isBienBan ? 13 : 14)) * scale)}pt`, lineHeight: 1.15, fontWeight: layout.style.bold ? 'bold' : 'normal', backgroundColor: layout.style.background, color: layout.style.color, wordBreak: 'normal', overflowWrap: 'anywhere' }}
                           >
                             {renderHighlighted(cell, highlightWords, onWordDoubleClick)}
                           </td>
-                        ))}
+                        )})}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <div key={i} style={{ ...bodyStyle, ...(isHeadingLine(block.text) ? { fontWeight: 'bold' } : {}) }}>
-                  {renderHighlighted(normalizeBodyText(block.text), highlightWords, onWordDoubleClick)}
+                <div key={i}>
+                  {block.text.split('\n').map((line, lineIndex) => line.trim() ? (
+                    <div key={lineIndex} style={{ ...bodyStyle, ...(isHeadingLine(line) ? { fontWeight: 'bold' } : {}) }}>
+                      {renderHighlighted(normalizeBodyText(line), highlightWords, onWordDoubleClick)}
+                    </div>
+                  ) : null)}
                 </div>
               )
             )}
@@ -346,7 +340,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
 
         {/* Kết luận/Yêu cầu: luôn tự động kết thúc bằng dấu "./." */}
         {state.conclusion && (
-          <div style={{ ...bodyStyle, ...(isHeadingLine(state.conclusion) ? { fontWeight: 'bold' } : {}) }}>
+          <div style={{ ...bodyStyle, whiteSpace: 'pre-line', ...(isHeadingLine(state.conclusion) ? { fontWeight: 'bold' } : {}) }}>
             {renderHighlighted(normalizeConclusion(state.conclusion), highlightWords, onWordDoubleClick)}
           </div>
         )}
@@ -393,12 +387,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
           </div>
 
           <div style={{ width: '50%', textAlign: 'center' }}>
-            {tmTitle && (
-              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>{tmTitle}</div>
-            )}
-            {ktTitle && (
-              <div style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>{ktTitle}</div>
-            )}
+            {authorityLines.map((line, i) => <div key={i} style={{ fontSize: '13pt', fontWeight: 'bold', textTransform: 'uppercase' }}>{line}</div>)}
             <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>{state.signPosition}</div>
             <div style={{ height: '90px' }} />
             <div style={{ fontWeight: 'bold' }}>{state.signName}</div>

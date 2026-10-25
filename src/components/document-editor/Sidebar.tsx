@@ -1,8 +1,7 @@
 'use client'
 
 import { Dispatch, useEffect, useRef, useState } from 'react'
-import { DocumentState, DocType, Agency, Signer, AIIssue } from '@/types'
-import AIAssistant from './AIAssistant'
+import { DocumentState, DocType, Agency, Signer } from '@/types'
 
 type Action =
   | { type: 'SET_FIELD'; field: keyof DocumentState; value: string }
@@ -22,7 +21,8 @@ interface SidebarProps {
   onDeleteVersion: (id: string) => void
   isSaving: boolean
   documentCount: number
-  onIssuesChange?: (issues: AIIssue[]) => void
+  isDriveDocument?: boolean
+  isLocalDocument?: boolean
 }
 
 const AGENCY_DEFAULTS: Record<string, { suffix: string; location: string }> = {}
@@ -39,7 +39,7 @@ export default function Sidebar({
   state, dispatch, agencies, signers,
   onSave, onNewDocument, onExportDocx,
   versions, onLoadVersion, onDeleteVersion,
-  isSaving, documentCount, onIssuesChange,
+  isSaving, documentCount, isDriveDocument, isLocalDocument,
 }: SidebarProps) {
   const [showHistory, setShowHistory] = useState(false)
   const historyRef = useRef<HTMLElement>(null)
@@ -53,6 +53,7 @@ export default function Sidebar({
 
   // Auto-fill agency and docSymbol on mount or when agencies change
   useEffect(() => {
+    if (isDriveDocument || isLocalDocument || state.sourceLayout) return
     if (agencies.length === 0) return
     const matched = agencies.find(a => a.main === state.agencyMain)
     if (!matched && agencies[0]) {
@@ -67,10 +68,11 @@ export default function Sidebar({
       const suffix = rawSuffix ? rawSuffix.replace(/^\//, '') : ''
       if (suffix) dispatch({ type: 'SET_FIELD', field: 'docSymbol', value: suffix })
     }
-  }, [agencies, state.agencyMain])
+  }, [agencies, state.agencyMain, isDriveDocument, isLocalDocument])
 
   // Auto-sync signer position & name when current signPosition is not present in signers list
   useEffect(() => {
+    if (isDriveDocument || isLocalDocument || state.sourceLayout) return
     if (signers.length === 0) return
     const matchedPosition = signers.some(s => s.position === state.signPosition)
     if (!matchedPosition && signers[0]) {
@@ -79,7 +81,7 @@ export default function Sidebar({
         dispatch({ type: 'SET_FIELD', field: 'signName', value: signers[0].name })
       }
     }
-  }, [signers, state.signPosition])
+  }, [signers, state.signPosition, isDriveDocument, isLocalDocument])
 
   const set = (field: keyof DocumentState) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -105,11 +107,11 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="w-[420px] min-w-[420px] bg-[#f7f8fc] border-r-[1.5px] border-[#dde1ef] flex flex-col z-10 shadow-[3px_0_18px_rgba(26,86,176,0.07)] overflow-hidden">
+    <aside className="h-full w-full min-w-0 bg-[#f7f8fc] border-r-[1.5px] border-[#dde1ef] flex flex-col z-10 shadow-[3px_0_18px_rgba(26,86,176,0.07)] overflow-hidden">
       {/* Header */}
       <header className="px-6 py-4 bg-[#1a56b0] text-white shrink-0">
         <h1 className="text-[1.1rem] font-bold tracking-[0.01em]">📄 Thể thức văn bản</h1>
-        <p className="text-[0.78rem] opacity-80 mt-0.5">Tác giả: Liêu Xuân Đào</p>
+        <p className="text-[0.78rem] opacity-80 mt-0.5">Tác giả: Trần Trí Nhân</p>
         <p className="text-[0.78rem] opacity-80 mt-0.5">Soạn thảo tự động – Chuẩn Nghị định 30/2020/NĐ-CP</p>
       </header>
 
@@ -126,6 +128,7 @@ export default function Sidebar({
               </Field>
               <Field label="Cơ quan ban hành">
                 <select value={state.agencyMain} onChange={handleAgencyChange} className={inputCls}>
+                  {!agencies.some(a => a.main === state.agencyMain) && <option value={state.agencyMain}>{state.agencyMain || '-- Chọn cơ quan --'}</option>}
                   {agencies.map(a => (
                     <option key={a.main} value={a.main}>{a.main}</option>
                   ))}
@@ -144,6 +147,7 @@ export default function Sidebar({
               </Field>
               <Field label="Ngày tháng năm">
                 <input type="date" value={state.date} onChange={set('date')} className={inputCls} />
+                {!state.date && state.dateText && <p className="mt-1 text-xs text-[#6b7597]">Ngày trong file nguồn: {state.dateText}</p>}
               </Field>
             </>
           )}
@@ -224,9 +228,13 @@ export default function Sidebar({
           ) : (
             /* --- Các loại khác: Chữ ký thông thường --- */
             <>
+              <Field label="Thể thức ký (TM., KT., TL., TUQ. nếu có)">
+                <textarea value={state.signAuthority ?? ''} onChange={set('signAuthority')} rows={2} className={`${inputCls} resize-y`} placeholder={state.signAuthority === undefined ? 'Tự động theo cơ quan và chức vụ' : 'Để trống nếu file nguồn không có thể thức ký'} />
+              </Field>
               <div className="flex gap-2.5">
                 <Field label="Chức vụ người ký" className="flex-1">
                   <select value={state.signPosition} onChange={set('signPosition')} className={inputCls}>
+                    {!signers.some(s => s.position === state.signPosition) && <option value={state.signPosition}>{state.signPosition || '-- Chọn chức vụ --'}</option>}
                     {[...new Set(signers.map(s => s.position))].map(p => (
                       <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>
                     ))}
@@ -235,6 +243,7 @@ export default function Sidebar({
                 <Field label="Họ và tên" className="flex-1">
                   <select value={state.signName} onChange={set('signName')} className={inputCls}>
                     <option value="">-- Chọn --</option>
+                    {state.signName && !filteredSigners.some(s => s.name === state.signName) && <option value={state.signName}>{state.signName}</option>}
                     {filteredSigners.map(s => (
                       <option key={s.name} value={s.name}>{s.name}</option>
                     ))}
@@ -246,16 +255,6 @@ export default function Sidebar({
               </Field>
             </>
           )}
-        </section>
-
-        {/* 6. Trợ lý AI Hành chính */}
-        <section className="bg-gradient-to-br from-[#f8fafc] to-[#f0f4ff] border-[1.5px] border-[#c3d0f5] rounded-lg p-4 shadow-sm">
-          <SectionTitle className="text-[#1a56b0] border-[#c3d0f5]">6. Trợ lý Thể thức &amp; Ngôn ngữ AI</SectionTitle>
-          <AIAssistant
-            state={state}
-            dispatch={dispatch}
-            onIssuesChange={onIssuesChange}
-          />
         </section>
 
         {/* Lịch sử phiên bản */}
@@ -309,7 +308,7 @@ export default function Sidebar({
         </div>
         <div className="flex gap-2">
           <button onClick={onSave} disabled={isSaving} className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-sm font-semibold bg-[#f59e0b] text-white hover:bg-[#d97706] disabled:opacity-60 transition-colors">
-            {isSaving ? 'Đang lưu...' : '💾 Lưu phiên bản'}
+            {isSaving ? 'Đang lưu...' : isLocalDocument ? 'File Save As' : isDriveDocument ? '☁️ Lưu Google Drive' : '💾 Lưu phiên bản'}
           </button>
           <button
             onClick={() => versions.length > 0 && onLoadVersion(versions[0].id)}

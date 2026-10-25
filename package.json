@@ -13,11 +13,13 @@
     "@supabase/supabase-js": "^2.105.4",
     "docx": "^9.6.1",
     "file-saver": "^2.0.5",
+    "jszip": "^3.10.2",
     "mammoth": "^1.12.0",
     "next": "16.2.6",
     "pdf-parse": "^2.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "word-extractor": "^1.0.4",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -27,8 +29,10 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/word-extractor": "^1.0.6",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

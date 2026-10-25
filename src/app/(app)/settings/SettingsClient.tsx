@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Agency, Signer } from '@/types'
 import { useRouter } from 'next/navigation'
+import AIConfiguration from '@/components/AIConfiguration'
 
 interface Props {
   agencies: Agency[]
@@ -17,6 +18,7 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
   const [signers, setSigners] = useState<Signer[]>(initSigners)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
+  const [saveError, setSaveError] = useState('')
 
   function showToast(msg: string) {
     setToast(msg)
@@ -25,6 +27,7 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
 
   async function saveConfig() {
     setSaving(true)
+    setSaveError('')
     try {
       const res = await fetch('/api/save-config', {
         method: 'POST',
@@ -32,7 +35,7 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
         body: JSON.stringify({ agencies, signers }),
       })
       const data = await res.json()
-      if (data.success) {
+      if (res.ok && data.success) {
         // Update state with confirmed saved data
         setAgencies(data.agencies)
         setSigners(data.signers)
@@ -40,11 +43,11 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
         router.refresh()
       } else {
         console.error('Save failed:', data.error)
-        showToast('Có lỗi xảy ra khi lưu!')
+        setSaveError(data.error || 'Không thể lưu cấu hình. Vui lòng thử lại.')
       }
     } catch (error) {
       console.error('Lỗi khi lưu cấu hình:', error)
-      showToast('Có lỗi xảy ra khi lưu cấu hình!')
+      setSaveError('Không kết nối được máy chủ để lưu cấu hình. Thông tin đang nhập được giữ nguyên; vui lòng thử lại.')
     } finally {
       setSaving(false)
     }
@@ -54,7 +57,7 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
     <div className="min-h-screen bg-[#dde3ee]">
       <nav className="bg-[#1a56b0] text-white px-6 py-3 flex items-center justify-between shadow-md">
         <div>
-          <h1 className="text-base font-bold">⚙️ Cài đặt</h1>
+          <h1 className="text-base font-bold">⚙️ Cài đặt ban đầu</h1>
           <p className="text-xs opacity-75">Thể thức văn bản</p>
         </div>
         <div className="flex items-center gap-3">
@@ -65,6 +68,7 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
       </nav>
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+        <p className="text-sm text-[#475569]">Khi đăng nhập Gmail, cơ quan ban hành và danh sách người ký được lưu riêng theo tài khoản và dùng lại khi đăng nhập trên thiết bị khác.</p>
         {/* Usage stats */}
         <div className="bg-white rounded-xl shadow-sm border border-[#dde1ef] p-5">
           <h2 className="text-sm font-bold text-[#7b8abf] uppercase tracking-wide mb-3">Thống kê sử dụng</h2>
@@ -75,6 +79,17 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
             </div>
           </div>
         </div>
+
+        <AIConfiguration />
+        <section className="rounded-xl border border-[#dde1ef] bg-white p-5 text-[#1a1f36] shadow-sm">
+          <h2 className="mb-2 text-sm font-bold text-[#7b8abf]">HỒ SƠ NGƯỜI DÙNG</h2>
+          <Link href="/profile" className="text-sm font-semibold text-[#1a56b0] underline">Đăng nhập Gmail và quản lý hồ sơ cá nhân →</Link>
+        </section>
+        <section className="rounded-xl border border-[#dde1ef] bg-white p-5 text-[#1a1f36] shadow-sm">
+          <h2 className="mb-2 text-sm font-bold text-[#7b8abf]">GOOGLE DRIVE CÁ NHÂN</h2>
+          <p className="mb-3 text-sm text-[#6b7597]">Kết nối tài khoản Google để duyệt thư mục, nhập tài liệu và tự động lưu chỉnh sửa vào file gốc trên Drive.</p>
+          <Link href="/drive" className="text-sm font-semibold text-[#1a56b0] underline">Kết nối và mở Google Drive →</Link>
+        </section>
 
         {/* Agencies config */}
         <div className="bg-white rounded-xl shadow-sm border border-[#dde1ef] p-5">
@@ -150,6 +165,7 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
           </div>
         </div>
 
+        {saveError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{saveError}</p>}
         <button
           onClick={saveConfig}
           disabled={saving}

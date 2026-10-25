@@ -38,12 +38,16 @@ interface DashboardClientProps {
   documents: Document[]
   documentCount: number
   tenantName: string
+  profileSaved?: boolean
+  userEmail?: string
 }
 
 export default function DashboardClient({
   documents: initialDocuments,
   documentCount: initialDocumentCount,
   tenantName,
+  profileSaved = false,
+  userEmail,
 }: DashboardClientProps) {
   const router = useRouter()
   const [folders, setFolders] = useState<string[]>([])
@@ -252,14 +256,14 @@ export default function DashboardClient({
   return (
     <div style={dashboardBg} className="min-h-screen font-sans antialiased text-[#1d1d1f]">
       {/* Sleek Top nav with frosted glass effect */}
-      <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-[#e0e0e0]/40 px-8 py-3.5 flex items-center justify-between transition-all duration-300">
+      <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-[#e0e0e0]/40 px-8 py-3.5 flex flex-wrap gap-3 items-center justify-between transition-all duration-300">
         <div className="flex flex-col">
           <h1 className="text-base font-bold text-[#1d1d1f] tracking-tight flex items-center gap-1.5">
             <span className="text-lg">📄</span> Thể thức văn bản
           </h1>
           <p className="text-[10px] text-[#7a7a7a] tracking-wide uppercase font-bold mt-0.5">{tenantName}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold text-[#0066cc] bg-[#0066cc]/10 px-3 py-1 rounded-full border border-[#0066cc]/10">
             {initialDocumentCount}/1000 văn bản
           </span>
@@ -269,11 +273,18 @@ export default function DashboardClient({
           >
             Cài đặt
           </Link>
+          <Link href="/drive" className="rounded-full border border-[#e0e0e0] bg-white/70 px-4 py-2 text-xs font-semibold text-[#1a56b0] hover:bg-white">Google Drive</Link>
+          <Link href="/documents/local" className="rounded-full border border-[#e0e0e0] bg-white/70 px-4 py-2 text-xs font-semibold text-[#1a56b0] hover:bg-white">Mở file từ máy</Link>
+          <Link href="/profile" title={userEmail ? `Hồ sơ: ${userEmail}` : 'Hồ sơ / Đăng nhập Gmail'} className="max-w-full truncate rounded-full border border-[#e0e0e0] bg-white/70 px-4 py-2 text-xs font-semibold text-[#1a56b0] hover:bg-white">{userEmail || 'Hồ sơ / Đăng nhập Gmail'}</Link>
         </div>
       </nav>
 
 
       <main className="max-w-4xl mx-auto px-6 py-12">
+        {profileSaved && <div role="status" className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-semibold text-green-800">
+          <span>✓ Đã lưu hồ sơ cá nhân thành công.</span>
+          <Link href="/dashboard" replace aria-label="Đóng thông báo đã lưu hồ sơ" className="shrink-0 rounded px-2 py-1 hover:bg-green-100">Đóng</Link>
+        </div>}
         {/* Sleek Apple Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-10">
           <div>

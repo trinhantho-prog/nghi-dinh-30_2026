@@ -1,11 +1,16 @@
 import {
-  Document, Packer, Paragraph, TextRun, AlignmentType,
-  BorderStyle, Table, TableRow, TableCell, WidthType,
+  Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType,
+  BorderStyle, Table, TableRow, TableCell, WidthType, TableLayoutType, VerticalMergeType, VerticalAlign,
   LineRuleType, convertInchesToTwip, Header, PageNumber,
 } from 'docx'
 import { saveAs } from 'file-saver'
 import { DocumentState, MainContentBlock } from '@/types'
 import { getEffectiveMainContentBlocks } from './mainContentBlocks'
+import { normalizeColumnWidths } from './tableSizing'
+import { signatureAuthorityLines } from '@/lib/document-signature'
+import { tableCellLayout, tableFontScale } from '@/lib/table-layout'
+import { documentImageSize } from '@/lib/document-image'
+import { exportSourceDocx } from './exportSourceDocx'
 
 const DOC_TYPE_TITLES: Record<string, string> = {
   'bao-cao': 'BÁO CÁO',
@@ -73,7 +78,7 @@ const parseRecipient = (recipient: string) => {
     }
     return { isMultiLine: false, firstLine: text, lines: [] }
   }
-  let contentLines = [...rawLines]
+  const contentLines = [...rawLines]
   if (/^kính gửi:?$/i.test(contentLines[0])) {
     contentLines.shift()
   } else if (/^kính gửi:\s*/i.test(contentLines[0])) {
@@ -147,7 +152,7 @@ function createConclusionParagraph(text: string, bold = false, fontSize = 28) {
     contextualSpacing: false,
     indent: { firstLine: cmToTwip(1.27), left: 0 },
     spacing: { before: 120, after: 120, line: 360, lineRule: LineRuleType.EXACT },
-    children: [new TextRun({ text: normalizedText, font: 'Times New Roman', size: fontSize, bold })],
+    children: normalizedText.split('\n').map((line, index) => new TextRun({ text: line, ...(index ? { break: 1 } : {}), font: 'Times New Roman', size: fontSize, bold })),
   })
 }
 
@@ -162,83 +167,73 @@ function createLegalBasisParagraph(text: string, fontSize = 28) {
   })
 }
 
-function createTableBlock(block: Extract<MainContentBlock, { type: 'table' }>, fontSize = 28) {
+function createTableBlock(block: Extract<MainContentBlock, { type: 'table' }>, fontSize = 28, contentWidth = cmToTwip(16.5)) {
+  const widths = normalizeColumnWidths(block.columnWidths, block.rows[0]?.length || 0)
+  const scale = tableFontScale(block, contentWidth / 15)
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: TableLayoutType.FIXED,
+    ...(block.borderless ? { borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } } } : {}),
+    columnWidths: widths.map(width => Math.round(contentWidth * width / 100)),
     // spacing trước/sau bảng = 0 để không có khoảng trống
-    rows: block.rows.map(row => new TableRow({
-      children: row.map(cell => new TableCell({
+    rows: block.rows.map((row, r) => new TableRow({
+      children: row.flatMap((cell, column) => {
+        const layout = tableCellLayout(block, r, column)
+        const merge = block.merges?.find(item => r >= item.row && r < item.row + item.rowSpan && column >= item.column && column < item.column + item.colSpan)
+        if (layout.hidden && column !== merge?.column) return []
+        const style = merge ? tableCellLayout(block, merge.row, merge.column).style : layout.style
+        const span = merge?.colSpan || 1
+        return [new TableCell({
+        width: { size: widths.slice(column, column + span).reduce((sum, width) => sum + width, 0), type: WidthType.PERCENTAGE },
+        columnSpan: span,
+        ...(merge && merge.rowSpan > 1 ? { verticalMerge: r === merge.row ? VerticalMergeType.RESTART : VerticalMergeType.CONTINUE } : {}),
+        verticalAlign: style.verticalAlign === 'top' || (!style.verticalAlign && !block.fontSize) ? VerticalAlign.TOP : style.verticalAlign === 'bottom' ? VerticalAlign.BOTTOM : VerticalAlign.CENTER,
+        ...(style.background ? { shading: { fill: style.background.slice(1) } } : {}),
         borders: {
-          top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-          bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-          left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
-          right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+          top: { style: block.borderless ? BorderStyle.NONE : BorderStyle.SINGLE, size: 4, color: '000000' },
+          bottom: { style: block.borderless ? BorderStyle.NONE : BorderStyle.SINGLE, size: 4, color: '000000' },
+          left: { style: block.borderless ? BorderStyle.NONE : BorderStyle.SINGLE, size: 4, color: '000000' },
+          right: { style: block.borderless ? BorderStyle.NONE : BorderStyle.SINGLE, size: 4, color: '000000' },
         },
-        margins: { top: 80, bottom: 80, left: 120, right: 120 },
-        children: [new Paragraph({
-          alignment: AlignmentType.LEFT,
+        margins: block.fontSize ? { top: 20, bottom: 20, left: 40, right: 40 } : { top: 80, bottom: 80, left: 120, right: 120 },
+        children: cell.split('\n').map(line => new Paragraph({
+          alignment: style.align === 'center' ? AlignmentType.CENTER : style.align === 'right' ? AlignmentType.RIGHT : AlignmentType.LEFT,
           spacing: { before: 0, after: 0 },
-          children: [new TextRun({ text: cell, font: 'Times New Roman', size: fontSize })],
-        })],
-      })),
+          children: [new TextRun({ text: line, font: 'Times New Roman', size: Math.max(12, Math.round((style.fontSize || block.fontSize || fontSize / 2) * scale * 2)), bold: style.bold, ...(style.color ? { color: style.color.slice(1) } : {}) })],
+        })),
+      })]
+      }),
     })),
   })
 }
 
-// Bọc bảng với paragraph rỗng spacing=0 trước/sau để không có khoảng trắng
-function createTableWithNoSpacing(block: Extract<MainContentBlock, { type: 'table' }>, fontSize = 28) {
-  const noSpacingPara = new Paragraph({ spacing: { before: 0, after: 0 }, children: [] })
-  return [noSpacingPara, createTableBlock(block, fontSize), noSpacingPara]
-}
-
-function createMainContentElements(blocks: MainContentBlock[], fontSize = 28) {
+function createMainContentElements(blocks: MainContentBlock[], fontSize = 28, contentWidth = cmToTwip(16.5)) {
   const elements: (Paragraph | Table)[] = []
   for (const block of blocks) {
     if (block.type === 'table') {
       // Paragraph trước bảng với spacing=0
       elements.push(new Paragraph({ spacing: { before: 0, after: 0 }, children: [] }))
-      elements.push(createTableBlock(block, fontSize))
+      elements.push(createTableBlock(block, fontSize, contentWidth))
       // Paragraph sau bảng với spacing=0
       elements.push(new Paragraph({ spacing: { before: 0, after: 0 }, children: [] }))
+    } else if (block.type === 'image') {
+      const data = Uint8Array.from(atob(block.src.slice(block.src.indexOf(',') + 1)), char => char.charCodeAt(0))
+      elements.push(new Paragraph({ alignment: block.align === 'left' ? AlignmentType.LEFT : block.align === 'right' ? AlignmentType.RIGHT : AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new ImageRun({ type: block.src.startsWith('data:image/jpeg') ? 'jpg' : 'png', data, transformation: documentImageSize(block, contentWidth / 15) })] }))
     } else {
       // Nội dung chính: dùng normalizeBodyText theo heading hay đoạn văn
-      elements.push(createBodyParagraph(block.text, isHeadingLine(block.text), fontSize))
+      for (const line of block.text.split('\n').map(text => text.trim()).filter(Boolean)) {
+        elements.push(createBodyParagraph(line, isHeadingLine(line), fontSize))
+      }
     }
   }
   return elements
 }
 
-function getTmTitle(agencyUpper: string): string {
-  if (!agencyUpper || !agencyUpper.trim()) return ''
-  const upper = agencyUpper.trim().toUpperCase()
-  if (/^TM\./i.test(upper)) return upper
-  if (
-    upper.includes('ỦY BAN') ||
-    upper.includes('HỘI ĐỒNG') ||
-    upper.includes('BAN CHẤP HÀNH') ||
-    upper.includes('BAN THƯỜNG VỤ') ||
-    upper.includes('HỘI ')
-  ) {
-    return `TM. ${upper}`
-  }
-  return ''
-}
-
-function getKtTitle(position: string): string {
-  if (!position || !/phó/i.test(position)) return ''
-  const headTitle = position
-    .replace(/^phó\s+/i, '')
-    .replace(/\bphó\b\s*/i, '')
-    .trim()
-    .toUpperCase()
-  return headTitle ? `KT. ${headTitle}` : ''
-}
-
-export async function exportDocx(state: DocumentState) {
+export async function createDocxBlob(state: DocumentState) {
+  if (state.sourceLayout) return exportSourceDocx(state)
   const isCongVan = state.docType === 'cong-van'
   const isBienBan = state.docType === 'bien-ban'
-  const tmTitle = getTmTitle(state.agencyUpper)
-  const ktTitle = getKtTitle(state.signPosition)
+  const authorityLines = signatureAuthorityLines(state)
   const bodyFontSize = isBienBan ? 26 : 28
   const mottoIndent = isBienBan ? 5.15 : 5.4
   const summaryIndent = isBienBan ? 6.0 : 6.25
@@ -250,7 +245,7 @@ export async function exportDocx(state: DocumentState) {
         const month = String(d.getMonth() + 1).padStart(2, '0')
         return `${state.location}, ngày ${day} tháng ${month} năm ${d.getFullYear()}`
       })()
-    : `${state.location}, ngày ... tháng ... năm ...`
+    : `${state.location}, ${state.dateText || 'ngày ... tháng ... năm ...'}`
 
   const parseRecipientsCcLines = (text: string): string[] => {
     if (!text || !text.trim()) return []
@@ -467,7 +462,7 @@ export async function exportDocx(state: DocumentState) {
         // Câu đặt vấn đề: ngay sát nội dung chính, không có khoảng cách
         ...(state.issueStatement ? [createBodyParagraph(state.issueStatement, isHeadingLine(state.issueStatement), bodyFontSize, true)] : []),
 
-        ...createMainContentElements(mainContentBlocks, bodyFontSize),
+        ...createMainContentElements(mainContentBlocks, bodyFontSize, cmToTwip(isBienBan ? 16 : 16.5)),
 
         // Kết luận/yêu cầu: luôn tự động kết thúc bằng dấu "./."
         ...(state.conclusion ? [createConclusionParagraph(state.conclusion, isHeadingLine(state.conclusion), bodyFontSize)] : []),
@@ -580,12 +575,9 @@ export async function exportDocx(state: DocumentState) {
                 width: { size: 50, type: WidthType.PERCENTAGE },
                 borders: noBorder,
                 children: [
-                  ...(tmTitle ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                    new TextRun({ text: tmTitle, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
-                  ]})] : []),
-                  ...(ktTitle ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                    new TextRun({ text: ktTitle, font: 'Times New Roman', bold: true, size: 28 }),
-                  ]})] : []),
+                  ...authorityLines.map(line => new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
+                  ]})),
                   new Paragraph({ alignment: AlignmentType.CENTER, children: [
                     new TextRun({ text: state.signPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
                   ]}),
@@ -607,7 +599,11 @@ export async function exportDocx(state: DocumentState) {
     }],
   })
 
-  const blob = await Packer.toBlob(doc)
+  return Packer.toBlob(doc)
+}
+
+export async function exportDocx(state: DocumentState) {
+  const blob = await createDocxBlob(state)
   const filename = `${removeVietnameseDiacritics(state.docSummary) || 'vanban'}.docx`
   saveAs(blob, filename)
 }

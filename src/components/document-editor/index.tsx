@@ -2,13 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { DocumentState, Agency, Signer, AIIssue, MainContentBlock } from '@/types'
+import { DocumentState, Agency, Signer } from '@/types'
 import { useDocumentReducer } from './useDocumentReducer'
 import Sidebar from './Sidebar'
-import A4Preview from './A4Preview'
-import { exportDocx } from './exportDocx'
+import EditorWorkspace from './EditorWorkspace'
+import { createDocxBlob, exportDocx } from './exportDocx'
+import { saveAs } from 'file-saver'
+import { chooseSaveFile, docxFilename, writeSaveFile } from '@/lib/local-file'
 import { saveDocument, saveVersion, deleteVersion } from '@/lib/actions/documents'
-import { parseTabularText, getEffectiveMainContentBlocks, plainTextToMainContentBlocks } from './mainContentBlocks'
+import MainContentEditor from './MainContentEditor'
+import { readAIConfig } from '@/lib/ai-config'
+import type { DriveSource } from '@/lib/drive-document'
+import { useDriveAutosave } from '@/components/google-drive/useDriveAutosave'
 
 interface DocVersion {
   id: string
@@ -23,6 +28,9 @@ interface DocumentEditorProps {
   agencies: Agency[]
   signers: Signer[]
   documentCount: number
+  driveSource?: DriveSource
+  driveInitialDirty?: boolean
+  localFileName?: string
 }
 
 export default function DocumentEditor({
@@ -32,6 +40,9 @@ export default function DocumentEditor({
   agencies,
   signers,
   documentCount,
+  driveSource,
+  driveInitialDirty,
+  localFileName,
 }: DocumentEditorProps) {
   const router = useRouter()
 
@@ -60,13 +71,19 @@ export default function DocumentEditor({
   const [versions, setVersions] = useState<DocVersion[]>(initialVersions)
   const [isSaving, setIsSaving] = useState(false)
   const [toast, setToast] = useState('')
-  const [aiIssues, setAiIssues] = useState<AIIssue[]>([])
+  const [fileSaving, setFileSaving] = useState(false)
+  const [fileError, setFileError] = useState('')
+  const [savedFileState, setSavedFileState] = useState('')
+  const [savedFileName, setSavedFileName] = useState(localFileName || '')
+  const fileDirty = Boolean(localFileName) && savedFileState !== JSON.stringify(state)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const currentDocIdRef = useRef<string | undefined>(documentId)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
+  const drive = useDriveAutosave(state, driveSource, driveInitialDirty)
 
   // Auto-save debounce 1.5s
   useEffect(() => {
+    if (driveSource || localFileName) return
     clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(async () => {
       const id = await saveDocument(state, currentDocIdRef.current)
@@ -81,7 +98,14 @@ export default function DocumentEditor({
       }
     }, 1500)
     return () => clearTimeout(saveTimerRef.current)
-  }, [state])
+  }, [state, driveSource, localFileName])
+
+  useEffect(() => {
+    if (!fileDirty) return
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [fileDirty])
 
 
   function showToast(msg: string) {
@@ -90,6 +114,8 @@ export default function DocumentEditor({
   }
 
   async function handleSaveVersion() {
+    if (localFileName) { await handleSaveAs(); return }
+    if (driveSource) { await drive.flush(); return }
     setIsSaving(true)
     try {
       // 1. Always save the document first so it persists in DB (Supabase / local DB)
@@ -157,13 +183,8 @@ export default function DocumentEditor({
     setCopilotResult('')
     
     try {
-      const activeProvider = localStorage.getItem('ai-active-provider') || 'gemini'
-      let storageKey = 'ai-gemini-key'
-      if (activeProvider === 'deepseek') storageKey = 'ai-deepseek-key'
-      else if (activeProvider === 'anthropic') storageKey = 'ai-anthropic-key'
-      
-      const apiKey = localStorage.getItem(storageKey) || ''
-      
+      const { provider: activeProvider, apiKey } = readAIConfig()
+
       const prompt = `Yêu cầu chỉnh sửa từ người dùng: ${copilotInstruction.trim()}
 
 Nội dung văn bản gốc hiện tại:
@@ -207,7 +228,13 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
     }
   }
 
-  function handleNewDocument() {
+  async function handleNewDocument() {
+    if (fileDirty && !window.confirm('Có thay đổi chưa lưu vào máy. Bạn có muốn tạo văn bản mới?')) return
+    if (localFileName) { router.push('/documents/new'); return }
+    if (driveSource) {
+      if (await drive.flush()) router.push('/documents/new')
+      return
+    }
     currentDocIdRef.current = undefined
     dispatch({ type: 'RESET', initialConfig: defaultConfig })
     setVersions([])
@@ -218,22 +245,57 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
     await exportDocx(state)
   }
 
-  function handleWordDoubleClick(word: string) {
-    const textarea = textareaRef.current
-    if (!textarea) return
-    const text = textarea.value
-    const index = text.indexOf(word)
-    if (index === -1) return
-    textarea.focus()
-    textarea.setSelectionRange(index, index + word.length)
-    const textBefore = text.substring(0, index)
-    const linesBefore = (textBefore.match(/\n/g) || []).length
-    textarea.scrollTop = Math.max(0, linesBefore * 24 - textarea.clientHeight / 3)
+  async function handleSaveAs() {
+    if (fileSaving) return
+    setFileSaving(true)
+    setFileError('')
+    const snapshot = JSON.stringify(state)
+    try {
+      const suggestedName = savedFileName || state.docSummary || 'van-ban'
+      const selection = chooseSaveFile(suggestedName)
+      if (selection) {
+        const handle = await selection
+        await writeSaveFile(handle, await createDocxBlob(state))
+        if (handle.name) setSavedFileName(handle.name)
+        setSavedFileState(snapshot)
+        showToast('Đã lưu file Word vào máy ✓')
+      } else {
+        const name = window.prompt('Tên file Word cần lưu (trình duyệt sẽ tải file xuống):', docxFilename(suggestedName))
+        if (!name?.trim()) return
+        const filename = docxFilename(name)
+        saveAs(await createDocxBlob(state), filename)
+        setSavedFileName(filename)
+        // A download does not confirm that the browser finished saving the file.
+        showToast('Đã gửi file Word tới trình tải xuống. Kiểm tra file đã tải.')
+      }
+    } catch (error) {
+      if (!(error instanceof Error && error.name === 'AbortError')) setFileError(error instanceof Error ? error.message : 'Không thể lưu file. Vui lòng thử lại.')
+    } finally { setFileSaving(false) }
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar
+    <div className="flex h-dvh min-w-0 flex-col overflow-hidden" onInputCapture={drive.markEdited} onClickCapture={drive.markEdited} onPasteCapture={drive.markEdited}>
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-5 py-2 text-xs text-slate-700">
+        <a href="/dashboard" className="font-semibold text-blue-700">← Văn bản</a>
+        <a href="/documents/local" className="rounded border border-slate-300 px-3 py-2 font-semibold">Mở file từ máy</a>
+        <button disabled={fileSaving} onClick={() => { void handleSaveAs() }} className="rounded bg-blue-700 px-3 py-2 font-semibold text-white disabled:opacity-50">{fileSaving ? 'Đang lưu file...' : 'File Save As'}</button>
+        {localFileName && <span role="status" className="min-w-0 flex-1 break-words">{localFileName} · {fileDirty ? 'Chưa lưu bản chỉnh sửa vào máy' : 'Đã lưu vào máy'}</span>}
+        <a href="/profile" className="ml-auto font-semibold text-blue-700">Hồ sơ người dùng</a>
+        {fileError && <p role="alert" className="w-full text-red-700">{fileError}</p>}
+      </div>
+      {driveSource && <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-5 py-2 text-xs text-[#1a1f36]">
+        <div className="flex flex-wrap items-center gap-3"><strong className="mr-auto">Google Drive: {driveSource.name}</strong><span role="status">{drive.status}</span><button className="font-semibold text-blue-700 underline" onClick={() => { void drive.flush() }}>Lưu ngay / Thử lại</button><button className="font-semibold text-blue-700 underline" onClick={async () => { if (await drive.flush()) router.push('/drive') }}>← Về Drive</button></div>
+        {drive.error && <p role="alert" className="mt-1 text-red-700">{drive.error} <a className="underline" href="/api/drive/connect" target="_blank" rel="noopener noreferrer">Kết nối lại Drive</a> · <button className="underline" onClick={() => window.location.reload()}>Mở lại bản trên Drive</button> · Có thể xuất DOCX để giữ bản đang sửa.</p>}
+        {drive.warning && <p role="alert" className="mt-1 text-amber-800">{drive.warning}</p>}
+      </div>}
+      <EditorWorkspace state={state} sidebar={
+      state.sourceLayout && !state.sourceSections ? <div className="flex h-full flex-col gap-4 overflow-auto border-r border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">
+        <h2 className="font-bold text-blue-800">Giữ bố cục file gốc</h2>
+        <p>Khổ trang, lề, đầu trang, chữ ký và định dạng bảng được lấy từ tài liệu đã mở.</p>
+        <p>Chỉnh sửa đầu trang, nội dung và chữ ký trực tiếp trong các đoạn văn và ô bảng ở phần soạn thảo.</p>
+        <button onClick={handleSaveVersion} className="rounded bg-blue-700 px-4 py-2 font-semibold text-white">{driveSource ? 'Lưu Google Drive' : 'File Save As'}</button>
+        <button onClick={handleNewDocument} className="rounded border border-slate-300 px-4 py-2">Tạo văn bản mới theo mẫu</button>
+      </div> : <Sidebar
         state={state}
         dispatch={dispatch}
         agencies={agencies.length > 0 ? agencies : [{ upper: state.agencyUpper, main: state.agencyMain, location: state.location }]}
@@ -246,24 +308,14 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
         onDeleteVersion={handleDeleteVersion}
         isSaving={isSaving}
         documentCount={documentCount}
-        onIssuesChange={setAiIssues}
+        isDriveDocument={Boolean(driveSource)}
+        isLocalDocument={Boolean(localFileName)}
       />
-
-      {/* Workspace: 50% editor | 50% preview */}
-      <main className="flex-1 overflow-hidden flex" style={{ background: 'radial-gradient(ellipse at 60% 40%, #d6ddf0 0%, #c8d0e8 100%)' }}>
-        {/* Left: Nội dung chính editor */}
-        <div className="w-1/2 flex flex-col border-r border-[#c8d0e8] overflow-hidden">
+      }>
           <div className="px-5 py-3 bg-white/60 border-b border-[#c8d0e8] shrink-0">
             <h2 className="text-sm font-bold text-[#1a56b0]">4. Nội dung chính</h2>
           </div>
-          <textarea
-            ref={textareaRef}
-            value={state.mainContent}
-            onChange={e => dispatch({ type: 'SET_FIELD', field: 'mainContent', value: e.target.value })}
-            className="flex-1 w-full p-5 resize-none text-[0.9rem] leading-relaxed bg-white/80 focus:outline-none focus:bg-white transition-colors"
-            style={{ fontFamily: '"Times New Roman", Times, serif' }}
-            placeholder="Nhập nội dung chính của văn bản..."
-          />
+          <MainContentEditor state={state} editorRef={editorRef} onChange={blocks => dispatch({ type: 'SET_CONTENT_BLOCKS', blocks })} />
 
           {state.mainContent?.trim() && (
             <div className="p-4 bg-[#f8fafc] border-t border-[#c8d0e8] shrink-0 space-y-3 shadow-inner">
@@ -278,7 +330,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
                   value={copilotInstruction}
                   onChange={e => setCopilotInstruction(e.target.value)}
                   placeholder="Yêu cầu AI viết thêm ý, sửa đổi hoặc viết ngắn gọn các ý..."
-                  className="flex-1 px-3 py-2 border-[1.5px] border-[#dde1ef] rounded-lg text-xs bg-white text-[#1a1f36] focus:outline-none focus:border-[#1a56b0] focus:ring-2 focus:ring-[#1a56b0]/10"
+                  className="min-w-0 flex-1 px-3 py-2 border-[1.5px] border-[#dde1ef] rounded-lg text-xs bg-white text-[#1a1f36] focus:outline-none focus:border-[#1a56b0] focus:ring-2 focus:ring-[#1a56b0]/10"
                   onKeyDown={e => {
                     if (e.key === 'Enter' && !copilotLoading && copilotInstruction.trim()) {
                       runAICopilot()
@@ -329,12 +381,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
               )}
             </div>
           )}
-        </div>
-        {/* Right: A4 Preview */}
-        <div className="w-1/2 overflow-y-auto py-10 px-8 flex justify-center">
-          <A4Preview state={state} highlightWords={aiIssues.map(i => i.description).filter(d => d && d.length >= 2 && d.length <= 60)} onWordDoubleClick={handleWordDoubleClick} />
-        </div>
-      </main>
+      </EditorWorkspace>
 
       {/* Toast */}
       {toast && (

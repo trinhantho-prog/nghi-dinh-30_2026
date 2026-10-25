@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { DocumentState, Agency, Signer } from '@/types'
 import { revalidatePath } from 'next/cache'
+import { getEditorConfig, saveEditorConfig } from '@/lib/user-editor-config'
 import {
   getLocalDocuments,
   getLocalDocument,
@@ -12,7 +13,6 @@ import {
   deleteLocalDocument,
   renameLocalFolder,
   deleteLocalFolder,
-  saveLocalConfig,
 } from '@/lib/storage/local-db'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -162,6 +162,12 @@ export async function deleteDocument(documentId: string) {
 }
 
 export async function getDocuments() {
+  const config = await getEditorConfig()
+  const result = await getDocumentsData()
+  return { ...result, ...config }
+}
+
+async function getDocumentsData() {
   const localRes = await getLocalDocuments()
   try {
     const supabase = await createClient()
@@ -213,6 +219,12 @@ export async function getDocuments() {
 }
 
 export async function getDocument(documentId: string) {
+  const config = await getEditorConfig()
+  const result = await getDocumentData(documentId)
+  return { ...result, ...config }
+}
+
+async function getDocumentData(documentId: string) {
   const localRes = await getLocalDocument(documentId)
 
   if (!isUUID(documentId)) {
@@ -336,26 +348,11 @@ export async function deleteFolder(folderName: string) {
 }
 
 export async function saveTenantConfig(agencies: Agency[], signers: Signer[]) {
-  console.log('[saveTenantConfig] Called with:', JSON.stringify({ agencies, signers }))
-  await saveLocalConfig({ agencies, signers })
-  try {
-    const supabase = await createClient()
-    const { tenantId } = await getTenantId(supabase)
-    if (tenantId !== 'local_tenant' && isUUID(tenantId)) {
-      const { error } = await supabase
-        .from('tenant_config')
-        .upsert({ tenant_id: tenantId, agencies, signers, updated_at: new Date().toISOString() })
-      if (error) {
-        console.error('[saveTenantConfig] Supabase error:', error)
-      }
-    }
-  } catch (e) {
-    console.warn('[saveTenantConfig] Supabase offline/error:', e)
-  }
+  const config = await saveEditorConfig({ agencies, signers })
   revalidatePath('/dashboard')
   revalidatePath('/settings')
   revalidatePath('/documents/new')
-  return true
+  return config
 }
 
 

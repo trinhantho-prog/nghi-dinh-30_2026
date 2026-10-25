@@ -171,3 +171,41 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER on_tenant_created
   AFTER INSERT ON tenants
   FOR EACH ROW EXECUTE FUNCTION create_default_tenant_config();
+
+-- =============================================
+-- GOOGLE / AUTH USER ONBOARDING TRIGGER
+-- =============================================
+
+CREATE OR REPLACE FUNCTION public.handle_new_user_onboarding()
+RETURNS TRIGGER AS $$
+DECLARE
+  new_tenant_id UUID;
+  user_name TEXT;
+BEGIN
+  -- Lấy tên hiển thị từ Google Metadata hoặc dùng Email
+  user_name := COALESCE(
+    NEW.raw_user_meta_data->>'full_name',
+    NEW.raw_user_meta_data->>'name',
+    SPLIT_PART(NEW.email, '@', 1)
+  );
+
+  -- 1. Tạo Tenant cá nhân cho user
+  INSERT INTO public.tenants (name, slug)
+  VALUES (
+    'Đơn vị của ' || user_name,
+    'workspace-' || LOWER(REPLACE(NEW.id::text, '-', ''))
+  )
+  RETURNING id INTO new_tenant_id;
+
+  -- 2. Gán user làm Admin của Tenant này
+  INSERT INTO public.tenant_members (tenant_id, user_id, role)
+  VALUES (new_tenant_id, NEW.id, 'admin');
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_onboarding();
+
