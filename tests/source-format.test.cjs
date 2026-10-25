@@ -252,6 +252,54 @@ test('cell fonts apply to selected merged cells and survive Drive validation, pr
   assert.equal(resized.cellStyles[0][0].fontSize,12)
 })
 
+test('DOCX keeps the conclusion and all signature rows together for new documents and imported multi-party minutes', async () => {
+  const { load } = harness()
+  const defaults = load('src/types/index.ts').DEFAULT_DOCUMENT_STATE
+  const conclusion = 'Biên bản được lập thành 02 bản có nội dung và giá trị pháp lý như nhau./.'
+  const parse = xml => new dom.window.DOMParser().parseFromString(xml,'application/xml')
+  for (const docType of ['cong-van','bien-ban']) {
+    const state = {...defaults,docType,mainContent:'Nội dung chính',conclusion,partyAUnit:'TỔ GIÁM ĐỊNH SỐ 2',partyBUnit:'CƠ SỞ KHÁM BỆNH, CHỮA BỆNH',partyAName:'Trần Thị Xuân Mỹ\nTrần Trí Nhân',partyBName:'Dương Quốc Định',signName:'Đoàn Văn Đồng'}
+    const blob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(state)
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer())
+    const doc = parse(await zip.file('word/document.xml').async('string'))
+    const p = Array.from(doc.getElementsByTagName('w:p')).find(node=>node.textContent===conclusion)
+    assert.equal(p.getElementsByTagName('w:keepNext').length,1)
+    assert.equal(p.getElementsByTagName('w:keepLines').length,1)
+    const tables = Array.from(doc.getElementsByTagName('w:tbl'))
+    const signature = tables.at(-1)
+    for (const row of signature.getElementsByTagName('w:tr')) assert.equal(row.getElementsByTagName('w:cantSplit').length,1)
+    for (const paragraph of signature.getElementsByTagName('w:p')) assert.equal(paragraph.getElementsByTagName('w:keepNext').length,1)
+  }
+  const source = await load('src/lib/import-docx.ts').importDocx(await fixture(),'Source.docx')
+  const business = source.mainContentBlocks.find(block=>block.type==='table')
+  const signature = {
+    type:'table',borderless:true,rows:[['TỔ GIÁM ĐỊNH SỐ 2','CƠ SỞ KHÁM BỆNH, CHỮA BỆNH'],['',''],['Trần Thị Xuân Mỹ\nTrần Trí Nhân','Dương Quốc Định']],
+    cellParagraphs:[
+      [[{type:'paragraph',text:'TỔ GIÁM ĐỊNH SỐ 2',style:{align:'center',bold:true}}],[{type:'paragraph',text:'CƠ SỞ KHÁM BỆNH, CHỮA BỆNH',style:{align:'center',bold:true}}]],
+      [[{type:'paragraph',text:'',style:{after:72}}],[{type:'paragraph',text:'',style:{after:72}}]],
+      [[{type:'paragraph',text:'Trần Thị Xuân Mỹ\nTrần Trí Nhân',style:{align:'center',pageBreakBefore:true}}],[{type:'paragraph',text:'Dương Quốc Định',style:{align:'center'}}]],
+    ],
+  }
+  const end = [{type:'paragraph',text:'Buổi làm việc kết thúc vào hồi 16 giờ 45 phút ngày 21/10/2026.'},{type:'paragraph',text:conclusion},{type:'paragraph',text:''},signature]
+  const state = {...source,docType:'bien-ban',sourceSections:undefined,mainContentBlocks:[business,...end],conclusion}
+  const original = JSON.stringify(state)
+  const blob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(state)
+  assert.equal(JSON.stringify(state),original,'pagination must not mutate imported data or table geometry')
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer())
+  const doc = parse(await zip.file('word/document.xml').async('string'))
+  const tables = Array.from(doc.getElementsByTagName('w:tbl'))
+  assert.equal(tables[0].getElementsByTagName('w:cantSplit').length,0,'business tables keep normal pagination')
+  const footer = tables[1]
+  assert.equal(footer.getElementsByTagName('w:cantSplit').length,3)
+  const rows = Array.from(footer.getElementsByTagName('w:tr'))
+  for (const row of rows.slice(0,-1)) for (const paragraph of row.getElementsByTagName('w:p')) assert.equal(paragraph.getElementsByTagName('w:keepNext').length,1)
+  for (const paragraph of footer.getElementsByTagName('w:p')) assert.equal(paragraph.getElementsByTagName('w:keepLines').length,1)
+  const names = Array.from(footer.getElementsByTagName('w:p')).find(node=>node.textContent.includes('Trần Thị Xuân Mỹ'))
+  assert.ok(!Array.from(names.getElementsByTagName('w:pageBreakBefore')).some(node=>!['false','0','off'].includes(node.getAttribute('w:val'))),'a forced source break cannot split the signature')
+  const closeParagraph = Array.from(doc.getElementsByTagName('w:p')).find(node=>node.textContent===conclusion)
+  assert.equal(closeParagraph.getElementsByTagName('w:keepNext').length,1)
+})
+
 test('Google Docs HTML uses the same administrative template without duplicating its header', async () => {
   const { load } = harness()
   const imported = await load('src/lib/drive-document.ts').importedHtmlToDocument('<p>ỦY BAN NHÂN DÂN</p><p>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p><p>Độc lập - Tự do - Hạnh phúc</p><h1>BÁO CÁO</h1><h2>Về kết quả thực hiện</h2><p>Nội dung báo cáo</p>', 'Drive')

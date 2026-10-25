@@ -5,6 +5,7 @@ import { tableCellLayout } from '@/lib/table-layout'
 import { documentImageSize } from '@/lib/document-image'
 import { normalizeColumnWidths } from './tableSizing'
 import { sourceDocumentBlocks } from '@/lib/source-administrative'
+import { sourceClosingStart } from '@/lib/document-signature'
 
 const alignment = (align?: SourceTextStyle['align']) => align === 'center' ? AlignmentType.CENTER : align === 'right' ? AlignmentType.RIGHT : align === 'justify' ? AlignmentType.JUSTIFIED : AlignmentType.LEFT
 let ruleId = 100000
@@ -33,12 +34,13 @@ function sourceRule(rule: NonNullable<MainContentParagraphBlock['rules']>[number
   ])
   return new TextRun({ children: [drawing] })
 }
-function paragraph(p: MainContentParagraphBlock) {
+function paragraph(p: MainContentParagraphBlock, keepNext = false, keepLines = false) {
   const s = p.style || {}
   const runs: MainContentParagraphBlock['runs'] = p.runs?.map(run => run.text).join('') === p.text ? p.runs : [{ text: p.text, style: s }]
   return new Paragraph({
     alignment: alignment(s.align),
-    pageBreakBefore: s.pageBreakBefore,
+    pageBreakBefore: keepLines ? false : s.pageBreakBefore,
+    ...(keepLines ? { keepLines: true, keepNext } : {}),
     indent: { left: (s.left || 0) * 20, right: (s.right || 0) * 20, ...(s.firstLine && s.firstLine < 0 ? { hanging: -s.firstLine * 20 } : { firstLine: (s.firstLine || 0) * 20 }) },
     spacing: { before: (s.before || 0) * 20, after: (s.after || 0) * 20, line: s.line ? s.line * 20 : (s.lineMultiple || 1) * 240, lineRule: s.line ? LineRuleType.EXACT : LineRuleType.AUTO },
     children: [...(runs || []).flatMap(run => run.text.split('\n').map((text, i) => {
@@ -48,14 +50,14 @@ function paragraph(p: MainContentParagraphBlock) {
   })
 }
 
-function table(block: MainContentTableBlock, pageWidth: number) {
+function table(block: MainContentTableBlock, pageWidth: number, keepTogether = false, keepAfter = false) {
   const width = (block.sourceWidth ? block.sourceWidth * 3 / 4 : pageWidth) * 20
   const columns = normalizeColumnWidths(block.columnWidths, block.rows[0].length)
   const border = { style: block.borderless ? BorderStyle.NONE : BorderStyle.SINGLE, size: 4, color: '000000' }
   return new Table({
     layout: TableLayoutType.FIXED, alignment: alignment(block.tableAlign), width: { size: Math.round(width), type: WidthType.DXA }, columnWidths: columns.map(value => Math.round(value / 100 * width)),
     borders: { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border },
-    rows: block.rows.map((row, r) => new TableRow({ children: row.flatMap((text, c) => {
+    rows: block.rows.map((row, r) => new TableRow({ ...(keepTogether ? { cantSplit: true } : {}), children: row.flatMap((text, c) => {
       const layout = tableCellLayout(block, r, c)
       const merge = block.merges?.find(item => r >= item.row && r < item.row + item.rowSpan && c >= item.column && c < item.column + item.colSpan)
       if (layout.hidden && c !== merge?.column) return []
@@ -67,7 +69,7 @@ function table(block: MainContentTableBlock, pageWidth: number) {
         ...(merge && merge.rowSpan > 1 ? { verticalMerge: r === merge.row ? VerticalMergeType.RESTART : VerticalMergeType.CONTINUE } : {}),
         verticalAlign: layout.style.verticalAlign === 'middle' ? VerticalAlign.CENTER : layout.style.verticalAlign === 'bottom' ? VerticalAlign.BOTTOM : VerticalAlign.TOP,
         margins: { top: 0, bottom: 0, left: 40, right: 40 }, borders: { top: border, bottom: border, left: border, right: border },
-        children: saved?.length ? saved.map(paragraph) : text.split('\n').map(line => paragraph({ type: 'paragraph', text: line, style: { ...fallback, fontFamily: layout.style.fontFamily || fallback?.fontFamily, fontSize: layout.style.fontSize || fallback?.fontSize || block.fontSize || 11, align: layout.style.align, bold: layout.style.bold } })),
+        children: saved?.length ? saved.map((p, index) => paragraph(p, keepTogether && (keepAfter || r < block.rows.length - 1 || index < saved.length - 1), keepTogether)) : text.split('\n').map((line, index, lines) => paragraph({ type: 'paragraph', text: line, style: { ...fallback, fontFamily: layout.style.fontFamily || fallback?.fontFamily, fontSize: layout.style.fontSize || fallback?.fontSize || block.fontSize || 11, align: layout.style.align, bold: layout.style.bold } }, keepTogether && (keepAfter || r < block.rows.length - 1 || index < lines.length - 1), keepTogether)),
       })]
     }) })),
   })
@@ -76,9 +78,12 @@ function table(block: MainContentTableBlock, pageWidth: number) {
 export function exportSourceDocx(state: DocumentState) {
   const page = state.sourceLayout!
   const contentWidth = page.width - page.left - page.right
-  const elements = (blocks: DocumentState['mainContentBlocks']) => (blocks || []).map(block => block.type === 'paragraph' ? paragraph(block) : block.type === 'table' ? table(block, contentWidth) : new Paragraph({
+  const body = sourceDocumentBlocks(state)
+  const closingStart = sourceClosingStart(state, body)
+  const elements = (blocks: DocumentState['mainContentBlocks'], closing = Infinity) => (blocks || []).map((block, index) => block.type === 'paragraph' ? paragraph(block, index >= closing && index < blocks!.length - 1, index >= closing) : block.type === 'table' ? table(block, contentWidth, index >= closing, index < blocks!.length - 1) : new Paragraph({
+    ...(index >= closing ? { keepLines: true, keepNext: index < blocks!.length - 1 } : {}),
     alignment: alignment(block.align), spacing: { before: 0, after: 0 },
     children: [new ImageRun({ type: block.src.startsWith('data:image/jpeg') ? 'jpg' : 'png', data: Uint8Array.from(atob(block.src.slice(block.src.indexOf(',') + 1)), char => char.charCodeAt(0)), transformation: documentImageSize(block, contentWidth * 4 / 3) })],
   }))
-  return Packer.toBlob(new Document({ styles: { default: { document: { run: { font: 'Times New Roman', size: 22 }, paragraph: { spacing: { before: 0, after: 0 } } } } }, sections: [{ properties: { titlePage: page.differentFirstPage, page: { pageNumbers: { start: 1 }, size: { width: Math.round(page.width * 20), height: Math.round(page.height * 20) }, margin: { top: Math.round(page.top * 20), bottom: Math.round(page.bottom * 20), left: Math.round(page.left * 20), right: Math.round(page.right * 20), header: Math.round((page.header || 0) * 20), footer: Math.round((page.footer || 0) * 20) } } }, ...(state.sourceHeader ? { headers: { default: new Header({ children: elements(state.sourceHeader) }), ...(page.differentFirstPage ? { first: new Header({ children: [new Paragraph({ children: [] })] }) } : {}) } } : {}), ...(state.sourceFooter ? { footers: { default: new Footer({ children: elements(state.sourceFooter) }) } } : {}), children: elements(sourceDocumentBlocks(state)) }] }))
+  return Packer.toBlob(new Document({ styles: { default: { document: { run: { font: 'Times New Roman', size: 22 }, paragraph: { spacing: { before: 0, after: 0 } } } } }, sections: [{ properties: { titlePage: page.differentFirstPage, page: { pageNumbers: { start: 1 }, size: { width: Math.round(page.width * 20), height: Math.round(page.height * 20) }, margin: { top: Math.round(page.top * 20), bottom: Math.round(page.bottom * 20), left: Math.round(page.left * 20), right: Math.round(page.right * 20), header: Math.round((page.header || 0) * 20), footer: Math.round((page.footer || 0) * 20) } } }, ...(state.sourceHeader ? { headers: { default: new Header({ children: elements(state.sourceHeader) }), ...(page.differentFirstPage ? { first: new Header({ children: [new Paragraph({ children: [] })] }) } : {}) } } : {}), ...(state.sourceFooter ? { footers: { default: new Footer({ children: elements(state.sourceFooter) }) } } : {}), children: elements(body, closingStart) }] }))
 }

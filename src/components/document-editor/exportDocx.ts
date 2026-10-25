@@ -98,7 +98,7 @@ const parseRecipient = (recipient: string) => {
   return { isMultiLine: true, firstLine: '', lines: formattedLines }
 }
 
-const emptyLine = () => new Paragraph({ children: [new TextRun({ text: '', font: 'Times New Roman', size: 28 })] })
+const emptyLine = (keepNext = false) => new Paragraph({ keepNext, keepLines: true, children: [new TextRun({ text: '', font: 'Times New Roman', size: 28 })] })
 const cmToTwip = (cm: number) => Math.round(convertInchesToTwip(cm / 2.54))
 
 const noBorder = {
@@ -147,7 +147,7 @@ function createBodyParagraph(text: string, bold = false, fontSize = 28, isFreeTe
 
 function createConclusionParagraph(text: string, bold = false, fontSize = 28) {
   const normalizedText = normalizeConclusion(text)
-  return new Paragraph({
+  return new Paragraph({ keepNext: true, keepLines: true,
     alignment: AlignmentType.BOTH,
     contextualSpacing: false,
     indent: { firstLine: cmToTwip(1.27), left: 0 },
@@ -467,14 +467,14 @@ export async function createDocxBlob(state: DocumentState) {
         // Kết luận/yêu cầu: luôn tự động kết thúc bằng dấu "./."
         ...(state.conclusion ? [createConclusionParagraph(state.conclusion, isHeadingLine(state.conclusion), bodyFontSize)] : []),
 
-        emptyLine(),
+        emptyLine(true),
 
         ...(isBienBan ? [
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             borders: noBorder,
             rows: [
-              new TableRow({ children: [
+              new TableRow({ cantSplit: true, children: [
                 new TableCell({
                   width: { size: 50, type: WidthType.PERCENTAGE },
                   borders: noBorder,
@@ -482,13 +482,13 @@ export async function createDocxBlob(state: DocumentState) {
                   children: [
                     // Tên cơ quan bên A: font 13pt (size 26), Times New Roman
                     ...state.partyAUnit.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                      new Paragraph({ keepNext: true, keepLines: true, alignment: AlignmentType.CENTER, children: [
                         new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
                       ]})
                     ),
                     // Chức vụ bên A: font 13pt (size 26), Times New Roman
                     ...state.partyAPosition.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                      new Paragraph({ keepNext: true, keepLines: true, alignment: AlignmentType.CENTER, children: [
                         new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
                       ]})
                     ),
@@ -501,41 +501,41 @@ export async function createDocxBlob(state: DocumentState) {
                   children: [
                     // Tên cơ quan bên B: font 13pt (size 26), Times New Roman
                     ...state.partyBUnit.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                      new Paragraph({ keepNext: true, keepLines: true, alignment: AlignmentType.CENTER, children: [
                         new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
                       ]})
                     ),
                     // Chức vụ bên B: font 13pt (size 26), Times New Roman
                     ...state.partyBPosition.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
-                      new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                      new Paragraph({ keepNext: true, keepLines: true, alignment: AlignmentType.CENTER, children: [
                         new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26, allCaps: true }),
                       ]})
                     ),
                   ],
                 }),
               ]}),
-              new TableRow({ children: [
+              new TableRow({ cantSplit: true, children: [
                 new TableCell({
                   width: { size: 50, type: WidthType.PERCENTAGE },
                   borders: noBorder,
                   margins: noCellMargins,
-                  children: [emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine()]
+                  children: [emptyLine(true), emptyLine(true), emptyLine(true), emptyLine(true), emptyLine(true), emptyLine(true)]
                 }),
                 new TableCell({
                   width: { size: 50, type: WidthType.PERCENTAGE },
                   borders: noBorder,
                   margins: noCellMargins,
-                  children: [emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine(), emptyLine()]
+                  children: [emptyLine(true), emptyLine(true), emptyLine(true), emptyLine(true), emptyLine(true), emptyLine(true)]
                 }),
               ]}),
-              new TableRow({ children: [
+              new TableRow({ cantSplit: true, children: [
                 new TableCell({
                   width: { size: 50, type: WidthType.PERCENTAGE },
                   borders: noBorder,
                   margins: noCellMargins,
                   // Họ và tên bên A: font 13pt (size 26), Times New Roman
                   children: state.partyAName.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
-                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new Paragraph({ keepNext: true, keepLines: true, alignment: AlignmentType.CENTER, children: [
                       new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26 }),
                     ]})
                   ),
@@ -546,7 +546,7 @@ export async function createDocxBlob(state: DocumentState) {
                   margins: noCellMargins,
                   // Họ và tên bên B: font 13pt (size 26), Times New Roman
                   children: state.partyBName.split('\n').map(l => l.trim()).filter(Boolean).map(line =>
-                    new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                    new Paragraph({ keepNext: true, keepLines: true, alignment: AlignmentType.CENTER, children: [
                       new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 26 }),
                     ]})
                   ),
@@ -558,15 +558,15 @@ export async function createDocxBlob(state: DocumentState) {
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             borders: noBorder,
-            rows: [new TableRow({ children: [
+            rows: [new TableRow({ cantSplit: true, children: [
               new TableCell({
                 width: { size: 50, type: WidthType.PERCENTAGE },
                 borders: noBorder,
                 children: [
-                  new Paragraph({ children: [
+                  new Paragraph({ keepNext: true, keepLines: true, children: [
                     new TextRun({ text: 'Nơi nhận:', font: 'Times New Roman', italics: true, bold: true, underline: {}, size: 24 }),
                   ]}),
-                  ...recipientsCcLines.map(line => new Paragraph({
+                  ...recipientsCcLines.map(line => new Paragraph({ keepNext: true, keepLines: true,
                     children: [new TextRun({ text: line, font: 'Times New Roman', size: 22 })],
                   })),
                 ],
@@ -575,19 +575,19 @@ export async function createDocxBlob(state: DocumentState) {
                 width: { size: 50, type: WidthType.PERCENTAGE },
                 borders: noBorder,
                 children: [
-                  ...authorityLines.map(line => new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  ...authorityLines.map(line => new Paragraph({ keepNext: true, keepLines: true, alignment: AlignmentType.CENTER, children: [
                     new TextRun({ text: line, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
                   ]})),
-                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  new Paragraph({ keepNext: true, keepLines: true, alignment: AlignmentType.CENTER, children: [
                     new TextRun({ text: state.signPosition, font: 'Times New Roman', bold: true, size: 28, allCaps: true }),
                   ]}),
-                  emptyLine(),
-                  emptyLine(),
-                  emptyLine(),
-                  emptyLine(),
-                  emptyLine(),
-                  emptyLine(),
-                  new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                  emptyLine(true),
+                  emptyLine(true),
+                  emptyLine(true),
+                  emptyLine(true),
+                  emptyLine(true),
+                  emptyLine(true),
+                  new Paragraph({ keepNext: true, keepLines: true, alignment: AlignmentType.CENTER, children: [
                     new TextRun({ text: state.signName, font: 'Times New Roman', bold: true, size: 28 }),
                   ]}),
                 ],
