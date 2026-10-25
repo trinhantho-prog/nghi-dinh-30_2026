@@ -22,7 +22,7 @@ function SourceBlocks({ blocks = [], contentWidth }: { blocks?: MainContentBlock
         if (layout.hidden) return null
         const paragraphs = matchingCellParagraphs(block.cellParagraphs?.[r]?.[c], text)
         const scale = 1
-        return <td key={c} rowSpan={layout.rowSpan} colSpan={layout.colSpan} style={{ border: block.borderless ? 'none' : '0.5pt solid black', padding: '0pt 2pt', verticalAlign: layout.style.verticalAlign || 'top', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', fontSize: `${(layout.style.fontSize || block.fontSize || 11) * scale}pt`, fontWeight: layout.style.bold ? 'bold' : 'normal', textAlign: layout.style.align || 'left' }}>
+        return <td key={c} rowSpan={layout.rowSpan} colSpan={layout.colSpan} style={{ border: block.borderless ? 'none' : '0.5pt solid black', padding: '0pt 2pt', verticalAlign: layout.style.verticalAlign || 'top', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', fontFamily: layout.style.fontFamily, fontSize: `${(layout.style.fontSize || block.fontSize || 11) * scale}pt`, fontWeight: layout.style.bold ? 'bold' : 'normal', textAlign: layout.style.align || 'left' }}>
           {paragraphs ? paragraphs.map((p, index) => <SourceParagraph key={index} paragraph={p} />) : text}
         </td>
       })}</tr>)}</tbody>

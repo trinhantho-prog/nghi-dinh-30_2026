@@ -199,7 +199,7 @@ function createTableBlock(block: Extract<MainContentBlock, { type: 'table' }>, f
         children: cell.split('\n').map(line => new Paragraph({
           alignment: style.align === 'center' ? AlignmentType.CENTER : style.align === 'right' ? AlignmentType.RIGHT : AlignmentType.LEFT,
           spacing: { before: 0, after: 0 },
-          children: [new TextRun({ text: line, font: 'Times New Roman', size: Math.max(12, Math.round((style.fontSize || block.fontSize || fontSize / 2) * scale * 2)), bold: style.bold, ...(style.color ? { color: style.color.slice(1) } : {}) })],
+          children: [new TextRun({ text: line, font: style.fontFamily || 'Times New Roman', size: Math.max(12, Math.round((style.fontSize || block.fontSize || fontSize / 2) * scale * 2)), bold: style.bold, ...(style.color ? { color: style.color.slice(1) } : {}) })],
         })),
       })]
       }),

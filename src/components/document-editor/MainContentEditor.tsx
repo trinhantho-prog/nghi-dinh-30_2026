@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DocumentState, MainContentBlock, MainContentTableBlock } from '@/types'
 import { getEffectiveMainContentBlocks, parseClipboardTable, parseTabularText } from './mainContentBlocks'
 import AutoSizeTableCell from './AutoSizeTableCell'
+import TableFontControls from './TableFontControls'
 import { normalizeColumnWidths, resizeColumnBoundary } from './tableSizing'
-import { CellRange, alignTableCells, changeTableStructure, expandCellRange, mergeTableCells, pasteTableInto, tableCellLayout, unmergeTableCells, visibleTableCells } from '@/lib/table-layout'
+import { CellRange, alignTableCells, changeTableStructure, expandCellRange, formatTableCellFont, mergeTableCells, pasteTableInto, tableCellLayout, unmergeTableCells, visibleTableCells } from '@/lib/table-layout'
 import { MAX_DOCUMENT_DATA_LENGTH, clipboardImageBlock, matchPreviousImageLayout } from '@/lib/document-image'
 import { editSourceParagraph } from '@/lib/source-format'
 
@@ -352,6 +353,17 @@ export default function MainContentEditor({ state, onChange, editorRef }: Props)
                 }}>{labels[action]}</button>
               })}
             </div>
+            <TableFontControls table={block} defaultSize={state.sourceLayout ? 11 : state.docType === 'bien-ban' ? 13 : 14}
+              range={cellSelection?.block === index ? cellSelection.range : activeCell.block === index ? { top: activeCell.row, bottom: activeCell.row, left: activeCell.column, right: activeCell.column } : undefined}
+              onSelectAll={() => {
+                setActiveCell({ block: index, row: 0, column: 0 })
+                setCellSelection({ block: index, range: { top: 0, left: 0, bottom: block.rows.length - 1, right: block.rows[0].length - 1 }, anchor: { row: 0, column: 0 } })
+              }}
+              onChange={font => {
+                const range = cellSelection?.block === index ? cellSelection.range : { top: activeCell.row, bottom: activeCell.row, left: activeCell.column, right: activeCell.column }
+                const next = formatTableCellFont(block, range, font)
+                onChange(content.map((item, i) => i === index ? next : item))
+              }} />
             <div className="overflow-x-auto">
               <div className="relative" style={{ minWidth: Math.max(240, block.sourceWidth || block.rows[0].length * 60) }}>
               <table data-table={index} className="w-full table-fixed border-collapse">
@@ -384,7 +396,7 @@ export default function MainContentEditor({ state, onChange, editorRef }: Props)
                       if (next === visible.length) { updateRows(index, [...block.rows, Array<string>(row.length).fill('')]); focusCell(index, block.rows.length, 0) }
                       else focusCell(index, visible[next].row, visible[next].column)
                     }}
-                    className="block w-full resize-none overflow-hidden bg-transparent text-black focus:bg-blue-50 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500" style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: `${layout.style.fontSize || block.fontSize || 10.5}pt`, fontWeight: layout.style.bold ? 'bold' : 'normal', textAlign: layout.style.align || 'left', color: layout.style.color, padding: block.fontSize ? '2px 3px' : '8px', lineHeight: block.fontSize ? 1.15 : '20px' }} />
+                    className="block w-full resize-none overflow-hidden bg-transparent text-black focus:bg-blue-50 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500" style={{ fontFamily: layout.style.fontFamily || 'Times New Roman', fontSize: `${layout.style.fontSize || block.fontSize || (state.sourceLayout ? 11 : state.docType === 'bien-ban' ? 13 : 14)}pt`, fontWeight: layout.style.bold ? 'bold' : 'normal', textAlign: layout.style.align || 'left', color: layout.style.color, padding: block.fontSize ? '2px 3px' : '8px', lineHeight: block.fontSize ? 1.15 : '20px' }} />
                 </td>})}</tr>)}
               </tbody></table>
               {normalizeColumnWidths(block.columnWidths, block.rows[0].length).slice(0, -1).map((width, c, widths) => (

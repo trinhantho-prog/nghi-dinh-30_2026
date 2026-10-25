@@ -174,6 +174,84 @@ test('reopening a saved source document and adding a paragraph keeps first-line 
   assert.deepEqual(updated.mainContentBlocks.find(block => block.type === 'table'), state.mainContentBlocks.find(block => block.type === 'table'))
 })
 
+test('centered minutes titles and the following document number retain their original layout; page two displays 2', async () => {
+  for (const splitTitle of [false, true]) {
+    const { load } = harness()
+    const zip = await JSZip.loadAsync(await fixture())
+    const centered = '<w:jc w:val="center"/><w:ind w:firstLine="0"/><w:spacing w:before="0" w:after="0" w:line="240"/>'
+    const title = splitTitle ? p('BIÊN BẢN',28,centered,'<w:b/>') + p('LÀM VIỆC',28,centered,'<w:b/>') : p('BIÊN BẢN LÀM VIỆC',28,centered,'<w:b/>')
+    const opening = p('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM',28,centered,'<w:b/>') + p('Độc lập - Tự do - Hạnh phúc',28,centered,'<w:b/><w:u w:val="single"/>') + title + p('Số: 02/BB',28,centered,'<w:b/>')
+    const body = p('Hôm nay, chúng tôi tiến hành làm việc về nội dung sau đây.',24,'<w:jc w:val="left"/><w:ind w:firstLine="0"/>','<w:b/>')
+    zip.file('word/document.xml', `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${opening}${body}<w:sectPr><w:pgNumType w:start="2"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:bottom="1134" w:left="1440" w:right="720"/></w:sectPr></w:body></w:document>`)
+    const original = await load('src/lib/import-docx.ts').importDocx(await zip.generateAsync({type:'arraybuffer'}), 'Biên bản làm việc.docx')
+    const state = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument(original)
+    assert.equal(state.docType, 'bien-ban')
+    assert.equal(state.docNumber, '02')
+    assert.equal(state.docSymbol, 'BB')
+    assert.deepEqual(state.sourceSections.opening, original.mainContentBlocks.slice(0, -1))
+    assert.equal(state.mainContentBlocks.length, 1, 'title and document number stay outside body normalization')
+    assert.equal(state.mainContentBlocks[0].style.firstLine, 36)
+    assert.equal(state.mainContentBlocks[0].style.fontSize, 13)
+    assert.deepEqual(load('src/lib/normalize-imported-document.ts').normalizeImportedDocument(state), state)
+    const blob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(state)
+    const output = await JSZip.loadAsync(await blob.arrayBuffer())
+    const xml = new dom.window.DOMParser().parseFromString(await output.file('word/document.xml').async('string'), 'application/xml')
+    const paragraphs = Array.from(xml.getElementsByTagName('w:p'))
+    for (const text of ['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', 'Độc lập - Tự do - Hạnh phúc', ...(splitTitle ? ['BIÊN BẢN','LÀM VIỆC'] : ['BIÊN BẢN LÀM VIỆC']), 'Số: 02/BB']) {
+      const matches = paragraphs.filter(node => node.textContent === text)
+      assert.equal(matches.length, 1)
+      assert.equal(matches[0].getElementsByTagName('w:jc')[0].getAttribute('w:val'), 'center')
+      assert.equal(matches[0].getElementsByTagName('w:ind')[0].getAttribute('w:firstLine'), '0')
+    }
+    assert.equal(xml.getElementsByTagName('w:titlePg').length, 1, 'first page uses its own blank header')
+    assert.equal(xml.getElementsByTagName('w:pgNumType')[0].getAttribute('w:start'), '1', 'count page one invisibly so the second physical page is 2')
+    const React = require('react')
+    const html = require('react-dom/server').renderToStaticMarkup(React.createElement(load('src/components/document-editor/A4Preview.tsx').default, {state}))
+    assert.ok(!html.includes('<header'), 'preview hides the page number on page one')
+  }
+})
+
+test('cell fonts apply to selected merged cells and survive Drive validation, preview and both Word export paths', async () => {
+  const { load } = harness()
+  const { formatTableCellFont } = load('src/lib/table-layout.ts')
+  const source = await load('src/lib/import-docx.ts').importDocx(await fixture(), 'Fonts.docx')
+  const original = source.mainContentBlocks.find(block => block.type === 'table')
+  const table = formatTableCellFont(original, {top:0,bottom:0,left:1,right:1}, {fontFamily:'Arial',fontSize:16})
+  assert.equal(table.cellStyles[0][1].fontFamily, 'Arial')
+  assert.equal(table.cellStyles[0][2].fontSize, 16, 'the selection expands across merged cells')
+  assert.deepEqual(table.cellStyles[2][0], original.cellStyles[2][0])
+  assert.equal(table.cellParagraphs[0][1][0].style.fontFamily, 'Arial')
+  assert.equal(table.cellParagraphs[0][1][0].runs[0].style.fontSize, 16)
+  assert.deepEqual(table.rows, original.rows)
+  assert.deepEqual(table.merges, original.merges)
+  assert.equal(formatTableCellFont(original, {top:0,bottom:0,left:0,right:0}, {fontSize:NaN,fontFamily:'Arial; color:red'}), original)
+  const validator = load('src/lib/drive-document.ts').validateDriveDocument
+  const state = validator({...source,mainContentBlocks:[table]})
+  assert.equal(state.mainContentBlocks[0].cellStyles[0][1].fontFamily, 'Arial')
+  const React = require('react')
+  for (const sourceLayout of [source.sourceLayout, undefined]) {
+    const current = {...state,sourceLayout,sourceSections:undefined}
+    const html = require('react-dom/server').renderToStaticMarkup(React.createElement(load('src/components/document-editor/A4Preview.tsx').default, {state:current}))
+    assert.match(html,/font-family:Arial/)
+    const blob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(current)
+    const output = await JSZip.loadAsync(await blob.arrayBuffer())
+    const xml = await output.file('word/document.xml').async('string')
+    assert.match(xml,/w:ascii="Arial"/)
+    if (sourceLayout) {
+      assert.match(xml,/w:sz w:val="32"/)
+      const reopened = await load('src/lib/import-docx.ts').importDocx(await blob.arrayBuffer(),'Saved.docx')
+      assert.equal(reopened.mainContentBlocks[0].cellStyles[0][1].fontFamily,'Arial')
+      assert.equal(reopened.mainContentBlocks[0].cellStyles[0][1].fontSize,16)
+    }
+  }
+  const blank = {type:'table',rows:[['A','B'],['C','D']]}
+  const styled = formatTableCellFont(blank,{top:0,bottom:1,left:0,right:1},{fontFamily:'Tahoma',fontSize:12})
+  assert.ok(styled.cellStyles.flat().every(style=>style.fontFamily==='Tahoma'&&style.fontSize===12))
+  const resized = formatTableCellFont(styled,{top:1,bottom:1,left:1,right:1},{fontSize:14})
+  assert.equal(resized.cellStyles[1][1].fontFamily,'Tahoma','changing size preserves the chosen family')
+  assert.equal(resized.cellStyles[0][0].fontSize,12)
+})
+
 test('Google Docs HTML uses the same administrative template without duplicating its header', async () => {
   const { load } = harness()
   const imported = await load('src/lib/drive-document.ts').importedHtmlToDocument('<p>ỦY BAN NHÂN DÂN</p><p>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p><p>Độc lập - Tự do - Hạnh phúc</p><h1>BÁO CÁO</h1><h2>Về kết quả thực hiện</h2><p>Nội dung báo cáo</p>', 'Drive')

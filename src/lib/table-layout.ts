@@ -44,6 +44,21 @@ export function alignTableCells(block: MainContentTableBlock, input: CellRange, 
   return { ...block, cellStyles, ...(cellParagraphs ? { cellParagraphs } : {}) }
 }
 
+export const TABLE_FONT_FAMILIES = ['Times New Roman', 'Arial', 'Calibri', 'Cambria', 'Tahoma', 'Verdana', 'Courier New']
+const validFontFamily = (value: unknown): value is string => typeof value === 'string' && /^[\p{L}\p{N} .,'-]{1,100}$/u.test(value)
+
+export function formatTableCellFont(block: MainContentTableBlock, input: CellRange, font: Pick<TableCellStyle, 'fontFamily' | 'fontSize'>): MainContentTableBlock {
+  const patch: Pick<TableCellStyle, 'fontFamily' | 'fontSize'> = {}
+  if (validFontFamily(font.fontFamily)) patch.fontFamily = font.fontFamily
+  if (typeof font.fontSize === 'number' && Number.isFinite(font.fontSize) && font.fontSize >= 6 && font.fontSize <= 36) patch.fontSize = font.fontSize
+  if (!Object.keys(patch).length) return block
+  const range = expandCellRange(block, input)
+  const selected = (r: number, c: number) => r >= range.top && r <= range.bottom && c >= range.left && c <= range.right
+  const cellStyles = block.rows.map((row, r) => row.map((_, c) => ({ ...block.cellStyles?.[r]?.[c], ...(selected(r, c) ? patch : {}) })))
+  const cellParagraphs = block.cellParagraphs?.map((row, r) => row.map((paragraphs, c) => selected(r, c) ? paragraphs.map(p => ({ ...p, style: { ...p.style, ...patch }, runs: p.runs?.map(run => ({ ...run, style: { ...run.style, ...patch } })) })) : paragraphs))
+  return { ...block, cellStyles, ...(cellParagraphs ? { cellParagraphs } : {}) }
+}
+
 export function tableCellLayout(block: MainContentTableBlock, row: number, column: number) {
   const merge = block.merges?.find(item => row >= item.row && row < item.row + item.rowSpan && column >= item.column && column < item.column + item.colSpan)
   return { hidden: Boolean(merge && (merge.row !== row || merge.column !== column)), rowSpan: merge?.rowSpan || 1, colSpan: merge?.colSpan || 1, style: block.cellStyles?.[row]?.[column] || {} }
@@ -75,6 +90,7 @@ export function validateTableLayout(block: MainContentTableBlock): MainContentTa
     if (!value || typeof value !== 'object') return {}
     const style: TableCellStyle = {}
     if (typeof value.bold === 'boolean') style.bold = value.bold
+    if (validFontFamily(value.fontFamily)) style.fontFamily = value.fontFamily
     if (['left', 'center', 'right'].includes(value.align || '')) style.align = value.align
     if (['top', 'middle', 'bottom'].includes(value.verticalAlign || '')) style.verticalAlign = value.verticalAlign
     if (/^#[\da-f]{6}$/i.test(value.background || '')) style.background = value.background

@@ -33,6 +33,7 @@ export type MainContentTableBlock = {
 
 export type TableCellMerge = { row: number; column: number; rowSpan: number; colSpan: number }
 export type TableCellStyle = {
+  fontFamily?: string
   bold?: boolean
   align?: 'left' | 'center' | 'right'
   verticalAlign?: 'top' | 'middle' | 'bottom'

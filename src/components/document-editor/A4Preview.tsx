@@ -316,7 +316,7 @@ export default function A4Preview({ state, highlightWords = [], onWordDoubleClic
                           <td
                             key={cellIndex}
                             rowSpan={layout.rowSpan} colSpan={layout.colSpan}
-                            style={{ border: block.borderless ? 'none' : '1px solid #000', padding: block.fontSize ? '1pt 2pt' : '4pt 6pt', verticalAlign: layout.style.verticalAlign || (block.fontSize ? 'middle' : 'top'), textAlign: layout.style.align || 'left', whiteSpace: 'pre-wrap', fontSize: `${Math.max(6, (layout.style.fontSize || block.fontSize || (isBienBan ? 13 : 14)) * scale)}pt`, lineHeight: 1.15, fontWeight: layout.style.bold ? 'bold' : 'normal', backgroundColor: layout.style.background, color: layout.style.color, wordBreak: 'normal', overflowWrap: 'anywhere' }}
+                            style={{ border: block.borderless ? 'none' : '1px solid #000', padding: block.fontSize ? '1pt 2pt' : '4pt 6pt', verticalAlign: layout.style.verticalAlign || (block.fontSize ? 'middle' : 'top'), textAlign: layout.style.align || 'left', whiteSpace: 'pre-wrap', fontFamily: layout.style.fontFamily || 'Times New Roman', fontSize: `${Math.max(6, (layout.style.fontSize || block.fontSize || (isBienBan ? 13 : 14)) * scale)}pt`, lineHeight: 1.15, fontWeight: layout.style.bold ? 'bold' : 'normal', backgroundColor: layout.style.background, color: layout.style.color, wordBreak: 'normal', overflowWrap: 'anywhere' }}
                           >
                             {renderHighlighted(cell, highlightWords, onWordDoubleClick)}
                           </td>

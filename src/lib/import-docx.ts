@@ -170,7 +170,7 @@ export async function importDocx(arrayBuffer: ArrayBuffer, name: string): Promis
           cellParagraphs[r][c] = paras
           rows[r][c] = paras.map(item => item.text).join('\n')
           const s = paras[0]?.runs?.[0]?.style || paras[0]?.style || defaultStyle
-          cellStyles[r][c] = { fontSize: s.fontSize, bold: s.bold, align: s.align === 'justify' ? 'left' : s.align, verticalAlign: val(child(tcPr, 'vAlign')) === 'center' ? 'middle' : val(child(tcPr, 'vAlign')) === 'bottom' ? 'bottom' : 'top' }
+          cellStyles[r][c] = { fontFamily: s.fontFamily, fontSize: s.fontSize, bold: s.bold, align: s.align === 'justify' ? 'left' : s.align, verticalAlign: val(child(tcPr, 'vAlign')) === 'center' ? 'middle' : val(child(tcPr, 'vAlign')) === 'bottom' ? 'bottom' : 'top' }
           if (span > 1 || vm) merges.push({ row: r, column: c, colSpan: span, rowSpan: 1 })
         }
         c += span

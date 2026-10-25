@@ -11,7 +11,7 @@ const isUpper = (text: string) => /\p{L}/u.test(text) && text.toLocaleUpperCase(
 const organization = /^(?:BẢO HIỂM XÃ HỘI|ỦY BAN|UỶ BAN|HỘI ĐỒNG|SỞ|PHÒNG|BỘ|CỤC|CHI CỤC|TRƯỜNG|BỆNH VIỆN|VĂN PHÒNG|BAN|ĐẢNG|CÔNG TY)(?=\s|$)/iu
 
 function titleType(text: string): DocType | undefined {
-  const types: Record<string, DocType> = { 'bao cao': 'bao-cao', 'thong bao': 'thong-bao', 'ke hoach': 'ke-hoach', 'bien ban': 'bien-ban', 'cong van': 'cong-van' }
+  const types: Record<string, DocType> = { 'bao cao': 'bao-cao', 'thong bao': 'thong-bao', 'ke hoach': 'ke-hoach', 'bien ban': 'bien-ban', 'bien ban lam viec': 'bien-ban', 'cong van': 'cong-van' }
   return types[fold(clean(text))]
 }
 
@@ -108,13 +108,21 @@ export function extractAdministrativeContent(input: MainContentBlock[], summaryH
     fields.docSummary = ''
     index++
     const summary: string[] = []
-    while (index < blocks.length && summary.length < 6) {
+    while (index < blocks.length && summary.length < 6 && fold(clean(title.text)) !== 'bien ban lam viec') {
       const block = blocks[index]
-      if (block.type !== 'paragraph' || isHeading(block.text) || titleType(block.text)) break
+      if (block.type !== 'paragraph' || isHeading(block.text) || titleType(block.text) || /^Số\s*[:：]/iu.test(block.text)) break
       if (!isUpper(block.text) && !summaryHints.has(block.text) && !/^Về(?=\s|$)/iu.test(block.text)) break
       summary.push(clean(block.text)); index++
     }
     fields.docSummary = summary.join(' ')
+    // Minutes often place the document number below their centered title.
+    // Keep it in the source opening instead of normalizing it as a body paragraph.
+    while (index < blocks.length) {
+      const block = blocks[index]
+      if (block.type !== 'paragraph' || !/^Số\s*:/iu.test(block.text)) break
+      metadata(block.text)
+      index++
+    }
   }
   const footer = extractDocumentFooter(blocks.slice(index), fields.docType || fallbackDocType)
   return { fields: { ...fields, ...footer.fields }, blocks: footer.blocks, headerFound, footerFound: footer.footerFound }
