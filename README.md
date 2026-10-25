@@ -125,6 +125,32 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+File `.env.local` dùng trên máy được `.gitignore` loại khỏi Git. Khi triển khai lên Vercel, cần cấu hình các biến trong **Project → Settings → Environment Variables**, chọn **Production** (thêm **Preview** nếu muốn dùng ở các bản xem trước). Tên biến và giá trị nhập vào hai ô riêng; sao chép giá trị thực từ `.env.local` trên máy, không đưa khóa bí mật vào README hay mã nguồn.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Tên biến | Giá trị |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL của Supabase |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key của cùng dự án Supabase |
+| `GOOGLE_DRIVE_CLIENT_ID` | OAuth Client ID đang dùng cho Google Drive trên máy |
+| `GOOGLE_DRIVE_CLIENT_SECRET` | Client Secret tương ứng |
+| `GOOGLE_DRIVE_COOKIE_SECRET` | Khóa mã hóa phiên đang dùng trên máy, ít nhất 32 ký tự |
+
+Với tên miền `https://nghi-dinh-30-2026.vercel.app`:
+
+1. Trong **Supabase → Authentication → URL Configuration**, đặt Site URL là `https://nghi-dinh-30-2026.vercel.app`, thêm Redirect URL `https://nghi-dinh-30-2026.vercel.app/auth/callback`. Giữ địa chỉ localhost nếu vẫn phát triển trên máy.
+2. Trong **Google Auth Platform → Clients → OAuth Client tương ứng → Authorized redirect URIs**, giữ callback đăng nhập Supabase `https://zzhqtrzwsaschwwibkza.supabase.co/auth/v1/callback` và thêm callback Drive `https://nghi-dinh-30-2026.vercel.app/api/drive/callback`. Nếu hai tính năng dùng hai OAuth Client khác nhau, khai báo mỗi callback ở đúng Client.
+3. Trong **Vercel → Deployments**, Redeploy bản Production sau khi lưu biến môi trường để build lại cả biến phía trình duyệt `NEXT_PUBLIC_`.
+4. Mở `/api/auth/google-status`: cấu hình đăng nhập hoạt động sẽ trả `{"ok":true}`. Mở `/api/drive/session`: khi đủ ba biến Drive sẽ có `"configured":true`; `"connected":false` là bình thường trước khi người dùng kết nối tài khoản trên tên miền mới.
+
+Tham khảo [biến môi trường Vercel](https://vercel.com/docs/environment-variables) và [Redirect URLs của Supabase](https://supabase.com/docs/guides/auth/redirect-urls).
+
+## Sửa lưu/xóa văn bản trên Vercel (25/10/2026)
+
+- Chế độ cục bộ lưu văn bản và lịch sử phiên bản trong bộ nhớ trình duyệt (`vanban_documents_v1`), không ghi vào file JSON của máy chủ Vercel. Văn bản còn sau khi tải lại trang trên cùng trình duyệt/thiết bị. Xóa dữ liệu trình duyệt sẽ xóa kho này; dùng **File Save As** để sao lưu Word. Chế độ này cần tải được ứng dụng; không phải ứng dụng PWA hoạt động hoàn toàn khi mất mạng.
+- Khi mở kho cục bộ lần đầu, khôi phục các bản nháp cũ có khóa `doc_doc_…`. Không nhập các bản cache UUID của tài khoản Google vì cache cũ không xác định được chủ sở hữu. File `data/local-db.json` trong repository không còn được dùng làm danh sách văn bản của mọi người trên website.
+- Đăng nhập Google lưu trực tiếp vào Supabase, kiểm tra lỗi và số dòng trả về khi lưu/xóa. Không ghi dự phòng sang file dùng chung hay báo thành công khi Supabase từ chối. Tài khoản chưa có kho được cấp kho cá nhân bằng RPC sau khi xác thực; không cần màn hình tạo/tham gia đơn vị.
+- Với dự án Supabase đã tồn tại, chạy **migrations/20261025_document_workspace.sql** một lần trong SQL Editor trước khi triển khai. Schema gốc trong `supabase-schema.sql` phải có sẵn. RPC chỉ được gọi bởi tài khoản đã đăng nhập và chỉ cấp kho cho chính tài khoản đó; giữ các chính sách RLS hiện có.
+- Đưa mã nguồn mới lên nhánh được Vercel dùng để build production, rồi Redeploy. Chỉ Redeploy commit cũ sẽ không có bản sửa. Không cần thêm khóa service role.
+- Kiểm tra sau triển khai: vào Local Mode → tạo văn bản → sửa trích yếu/nội dung → về danh sách → tải lại → mở lại → xóa → tải lại để xác nhận không xuất hiện lại. Kiểm tra thêm lưu/xóa với tài khoản Google thật sau khi chạy SQL. Trạng thái chưa lưu sẽ giữ trên màn hình khi thao tác gặp lỗi.
+
+Kiểm thử hồi quy: `node --test tests/document-persistence.test.cjs tests/user-editor-config.test.cjs tests/local-file.test.cjs tests/google-login.test.cjs`; build: `npm run build`.

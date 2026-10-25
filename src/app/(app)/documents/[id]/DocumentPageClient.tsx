@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import DocumentEditor from '@/components/document-editor'
 import { DocumentState, Agency, Signer } from '@/types'
 import Link from 'next/link'
+import { getBrowserDocument } from '@/lib/storage/browser-documents'
 
 interface DocVersion {
   id: string
@@ -12,6 +13,7 @@ interface DocVersion {
 }
 
 interface Props {
+  storageMode: 'browser' | 'cloud'
   documentId: string
   initialDocument: any
   initialVersions: DocVersion[]
@@ -21,6 +23,7 @@ interface Props {
 }
 
 export default function DocumentPageClient({
+  storageMode,
   documentId,
   initialDocument,
   initialVersions,
@@ -28,6 +31,7 @@ export default function DocumentPageClient({
   signers,
   documentCount,
 }: Props) {
+  const [versions, setVersions] = useState(initialVersions)
   const [documentData, setDocumentData] = useState<DocumentState | null>(
     initialDocument?.content
       ? (initialDocument.content as DocumentState)
@@ -38,20 +42,18 @@ export default function DocumentPageClient({
   const [loading, setLoading] = useState(!initialDocument)
 
   useEffect(() => {
-    if (!initialDocument) {
-      // Try to recover from client localStorage if server didn't find it (e.g. Vercel serverless environment)
+    if (storageMode === 'browser') {
+      // Only local mode can read this device's browser workspace.
       try {
-        const storedDoc = localStorage.getItem(`doc_${documentId}`)
-        if (storedDoc) {
-          const parsed = JSON.parse(storedDoc)
-          setDocumentData(parsed)
-        }
+        const stored = getBrowserDocument(documentId)
+        setDocumentData(stored.document?.content ?? null)
+        setVersions(stored.versions)
       } catch (e) {
         console.error('Error recovering document from localStorage:', e)
       }
-      setLoading(false)
     }
-  }, [documentId, initialDocument])
+    setLoading(false)
+  }, [documentId, initialDocument, storageMode])
 
   if (loading) {
     return (
@@ -94,9 +96,11 @@ export default function DocumentPageClient({
 
   return (
     <DocumentEditor
+      key={documentId}
+      storageMode={storageMode}
       documentId={documentId}
       initialData={documentData || (initialDocument?.content as DocumentState)}
-      initialVersions={initialVersions}
+      initialVersions={versions}
       agencies={agencies}
       signers={signers}
       documentCount={documentCount}

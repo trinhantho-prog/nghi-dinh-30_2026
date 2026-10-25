@@ -3,16 +3,22 @@
 import { deleteDocument } from '@/lib/actions/documents'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { deleteBrowserDocument } from '@/lib/storage/browser-documents'
 
-export default function DeleteDocumentButton({ documentId }: { documentId: string }) {
+export default function DeleteDocumentButton({ documentId, storageMode }: { documentId: string; storageMode: 'browser' | 'cloud' }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
   async function handleDelete() {
     if (!confirm('Xóa văn bản này?')) return
     setLoading(true)
-    await deleteDocument(documentId)
-    router.refresh()
+    try {
+      if (storageMode === 'browser') deleteBrowserDocument(documentId)
+      else await deleteDocument(documentId)
+      router.refresh()
+    } catch {
+      alert('Không xóa được văn bản. Vui lòng kiểm tra kết nối hoặc quyền truy cập và thử lại.')
+    } finally { setLoading(false) }
   }
 
   return (

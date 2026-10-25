@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { renameFolder, deleteFolder } from '@/lib/actions/documents'
 import DeleteDocumentButton from './DeleteDocumentButton'
+import { getBrowserDocuments, renameBrowserFolder } from '@/lib/storage/browser-documents'
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   'cong-van': 'Công Văn',
@@ -35,6 +36,7 @@ interface Document {
 }
 
 interface DashboardClientProps {
+  storageMode: 'browser' | 'cloud'
   documents: Document[]
   documentCount: number
   tenantName: string
@@ -43,13 +45,33 @@ interface DashboardClientProps {
 }
 
 export default function DashboardClient({
-  documents: initialDocuments,
-  documentCount: initialDocumentCount,
+  storageMode,
+  documents: serverDocuments,
   tenantName,
   profileSaved = false,
   userEmail,
 }: DashboardClientProps) {
   const router = useRouter()
+  const [browserDocuments, setBrowserDocuments] = useState<Document[]>([])
+  const [storageError, setStorageError] = useState('')
+  const initialDocuments = storageMode === 'browser' ? browserDocuments : serverDocuments
+  const initialDocumentCount = initialDocuments.length
+  useEffect(() => {
+    if (storageMode !== 'browser') return
+    const reload = () => {
+      try { setBrowserDocuments(getBrowserDocuments()); setStorageError('') }
+      catch { setStorageError('Không đọc được kho văn bản trên trình duyệt. Vui lòng kiểm tra quyền lưu trữ.') }
+    }
+    reload()
+    window.addEventListener('vanban-documents-changed', reload)
+    window.addEventListener('storage', reload)
+    window.addEventListener('pageshow', reload)
+    return () => {
+      window.removeEventListener('vanban-documents-changed', reload)
+      window.removeEventListener('storage', reload)
+      window.removeEventListener('pageshow', reload)
+    }
+  }, [storageMode])
   const [folders, setFolders] = useState<string[]>([])
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({})
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)
@@ -125,7 +147,9 @@ export default function DashboardClient({
     }
 
     setLoadingFolder(oldName)
-    const success = await renameFolder(oldName, trimmed)
+    let success = false
+    try { success = storageMode === 'browser' ? renameBrowserFolder(oldName, trimmed) : await renameFolder(oldName, trimmed) }
+    catch { alert('Không đổi tên được thư mục. Vui lòng thử lại.'); setLoadingFolder(null); return }
     if (success) {
       // Update local storage
       const updated = folders.map(f => f === oldName ? trimmed : f).sort()
@@ -160,7 +184,9 @@ export default function DashboardClient({
     if (!confirm(confirmMsg)) return
 
     setLoadingFolder(folderName)
-    const success = await deleteFolder(folderName)
+    let success = false
+    try { success = storageMode === 'browser' ? renameBrowserFolder(folderName, '') : await deleteFolder(folderName) }
+    catch { alert('Không xóa được thư mục. Vui lòng thử lại.'); setLoadingFolder(null); return }
     if (success) {
       // Update local storage
       const updated = folders.filter(f => f !== folderName)
@@ -246,7 +272,7 @@ export default function DashboardClient({
             >
               Mở →
             </Link>
-            <DeleteDocumentButton documentId={doc.id} />
+            <DeleteDocumentButton documentId={doc.id} storageMode={storageMode} />
           </div>
         </div>
       </div>
@@ -255,6 +281,8 @@ export default function DashboardClient({
 
   return (
     <div style={dashboardBg} className="min-h-screen font-sans antialiased text-[#1d1d1f]">
+      {storageMode === 'browser' && <p className="bg-blue-50 px-8 py-2 text-sm text-blue-800">Văn bản cục bộ được lưu trên trình duyệt và thiết bị này. Dùng File Save As để sao lưu file Word.</p>}
+      {storageError && <p role="alert" className="bg-red-50 px-8 py-2 text-sm text-red-700">{storageError}</p>}
       {/* Sleek Top nav with frosted glass effect */}
       <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-[#e0e0e0]/40 px-8 py-3.5 flex flex-wrap gap-3 items-center justify-between transition-all duration-300">
         <div className="flex flex-col">

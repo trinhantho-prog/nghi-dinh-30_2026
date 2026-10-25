@@ -4,7 +4,7 @@ import DashboardClient from './DashboardClient'
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ profileSaved?: string }> }) {
   const { profileSaved } = await searchParams
-  const { documents, documentCount } = await getDocuments()
+  const { documents, documentCount, storageMode } = await getDocuments()
   let userEmail: string | undefined
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
     try {
@@ -16,6 +16,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <DashboardClient
+      storageMode={storageMode}
       documents={documents as any}
       documentCount={documentCount}
       tenantName="Thể thức văn bản"

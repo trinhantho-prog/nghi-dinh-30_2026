@@ -7,10 +7,11 @@ interface Props {
 
 export default async function DocumentPage({ params }: Props) {
   const { id } = await params
-  const { document, versions, agencies, signers, documentCount } = await getDocument(id)
+  const { document, versions, agencies, signers, documentCount, storageMode } = await getDocument(id)
 
   return (
     <DocumentPageClient
+      storageMode={storageMode}
       documentId={id}
       initialDocument={document}
       initialVersions={(versions || []) as any}

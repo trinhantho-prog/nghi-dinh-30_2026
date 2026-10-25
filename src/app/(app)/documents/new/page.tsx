@@ -7,10 +7,11 @@ interface PageProps {
 
 export default async function NewDocumentPage({ searchParams }: PageProps) {
   const { folder } = await searchParams
-  const { agencies, signers, documentCount } = await getDocuments()
+  const { agencies, signers, documentCount, storageMode } = await getDocuments()
 
   return (
     <DocumentEditor
+      storageMode={storageMode}
       agencies={agencies}
       signers={signers}
       documentCount={documentCount}

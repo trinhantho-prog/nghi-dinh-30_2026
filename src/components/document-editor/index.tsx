@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { DocumentState, Agency, Signer } from '@/types'
 import { useDocumentReducer } from './useDocumentReducer'
@@ -10,6 +11,7 @@ import { createDocxBlob, exportDocx } from './exportDocx'
 import { saveAs } from 'file-saver'
 import { chooseSaveFile, docxFilename, writeSaveFile } from '@/lib/local-file'
 import { saveDocument, saveVersion, deleteVersion } from '@/lib/actions/documents'
+import { saveBrowserDocument, saveBrowserVersion, deleteBrowserVersion } from '@/lib/storage/browser-documents'
 import MainContentEditor from './MainContentEditor'
 import { readAIConfig } from '@/lib/ai-config'
 import type { DriveSource } from '@/lib/drive-document'
@@ -22,6 +24,7 @@ interface DocVersion {
 }
 
 interface DocumentEditorProps {
+  storageMode?: 'browser' | 'cloud'
   documentId?: string
   initialData?: Partial<DocumentState>
   initialVersions?: DocVersion[]
@@ -34,6 +37,7 @@ interface DocumentEditorProps {
 }
 
 export default function DocumentEditor({
+  storageMode = 'cloud',
   documentId,
   initialData,
   initialVersions = [],
@@ -71,6 +75,8 @@ export default function DocumentEditor({
   const [versions, setVersions] = useState<DocVersion[]>(initialVersions)
   const [isSaving, setIsSaving] = useState(false)
   const [toast, setToast] = useState('')
+  const [saveError, setSaveError] = useState('')
+  const [savedState, setSavedState] = useState(initialData ? JSON.stringify(mergedInitial) : '')
   const [fileSaving, setFileSaving] = useState(false)
   const [fileError, setFileError] = useState('')
   const [savedFileState, setSavedFileState] = useState('')
@@ -78,34 +84,44 @@ export default function DocumentEditor({
   const fileDirty = Boolean(localFileName) && savedFileState !== JSON.stringify(state)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const currentDocIdRef = useRef<string | undefined>(documentId)
+  const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve())
   const editorRef = useRef<HTMLDivElement>(null)
   const drive = useDriveAutosave(state, driveSource, driveInitialDirty)
+
+  const persistDocument = useCallback((snapshot: DocumentState) => {
+    const request = saveQueueRef.current.catch(() => {}).then(async () => {
+      const id = storageMode === 'browser'
+        ? saveBrowserDocument(snapshot, currentDocIdRef.current)
+        : await saveDocument(snapshot, currentDocIdRef.current)
+      const isNew = !currentDocIdRef.current
+      currentDocIdRef.current = id
+      setSavedState(JSON.stringify(snapshot))
+      setSaveError('')
+      // Keep this editor mounted while adopting the saved URL, including on Vercel.
+      if (isNew) window.history.replaceState(null, '', `/documents/${id}`)
+      return id
+    })
+    saveQueueRef.current = request
+    return request
+  }, [storageMode])
 
   // Auto-save debounce 1.5s
   useEffect(() => {
     if (driveSource || localFileName) return
     clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(async () => {
-      const id = await saveDocument(state, currentDocIdRef.current)
-      if (id) {
-        try {
-          localStorage.setItem(`doc_${id}`, JSON.stringify(state))
-        } catch (e) {}
-        if (!currentDocIdRef.current) {
-          currentDocIdRef.current = id
-          router.replace(`/documents/${id}`, { scroll: false })
-        }
-      }
+      try { await persistDocument(state) }
+      catch { setSaveError('Chưa lưu được văn bản. Hãy kiểm tra kết nối hoặc dung lượng trình duyệt, rồi bấm Lưu để thử lại.') }
     }, 1500)
     return () => clearTimeout(saveTimerRef.current)
-  }, [state, driveSource, localFileName])
+  }, [state, driveSource, localFileName, persistDocument])
 
   useEffect(() => {
-    if (!fileDirty) return
+    if (!fileDirty && (driveSource || localFileName || savedState === JSON.stringify(state))) return
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [fileDirty])
+  }, [fileDirty, driveSource, localFileName, savedState, state])
 
 
   function showToast(msg: string) {
@@ -119,16 +135,8 @@ export default function DocumentEditor({
     setIsSaving(true)
     try {
       // 1. Always save the document first so it persists in DB (Supabase / local DB)
-      const id = await saveDocument(state, currentDocIdRef.current)
-      if (id) {
-        currentDocIdRef.current = id
-        try {
-          localStorage.setItem(`doc_${id}`, JSON.stringify(state))
-        } catch (e) {}
-        if (!documentId) {
-          router.replace(`/documents/${id}`, { scroll: false })
-        }
-      }
+      clearTimeout(saveTimerRef.current)
+      const id = await persistDocument(state)
 
       const activeDocId = id || currentDocIdRef.current
       if (!activeDocId) {
@@ -142,15 +150,15 @@ export default function DocumentEditor({
       }
 
       // 2. Save version snapshot
-      const newVersion = await saveVersion(activeDocId, state)
+      const newVersion = storageMode === 'browser' ? saveBrowserVersion(activeDocId, state) : await saveVersion(activeDocId, state)
       if (newVersion) {
         setVersions(prev => [newVersion, ...prev])
         showToast('Đã lưu văn bản & phiên bản ✓')
       } else {
         showToast('Đã lưu văn bản ✓')
       }
-    } catch (e) {
-      showToast('Có lỗi khi lưu phiên bản')
+    } catch {
+      setSaveError('Không lưu được văn bản hoặc phiên bản. Vui lòng thử lại hoặc dùng File Save As để lưu bản Word.')
     } finally {
       setIsSaving(false)
     }
@@ -165,9 +173,12 @@ export default function DocumentEditor({
   }
 
   async function handleDeleteVersion(versionId: string) {
-    await deleteVersion(versionId)
-    setVersions(prev => prev.filter(v => v.id !== versionId))
-    showToast('Đã xóa phiên bản')
+    try {
+      if (storageMode === 'browser') deleteBrowserVersion(versionId)
+      else await deleteVersion(versionId)
+      setVersions(prev => prev.filter(v => v.id !== versionId))
+      showToast('Đã xóa phiên bản')
+    } catch { setSaveError('Không xóa được phiên bản. Vui lòng thử lại.') }
   }
 
   // AI Copilot States
@@ -235,7 +246,11 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
       if (await drive.flush()) router.push('/documents/new')
       return
     }
+    clearTimeout(saveTimerRef.current)
+    try { await persistDocument(state) }
+    catch { setSaveError('Chưa lưu được văn bản hiện tại. Vui lòng bấm Lưu để thử lại trước khi tạo văn bản mới.'); return }
     currentDocIdRef.current = undefined
+    setSavedState('')
     dispatch({ type: 'RESET', initialConfig: defaultConfig })
     setVersions([])
     router.push('/documents/new')
@@ -274,13 +289,24 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
   }
 
   return (
-    <div className="flex h-dvh min-w-0 flex-col overflow-hidden" onInputCapture={drive.markEdited} onClickCapture={drive.markEdited} onPasteCapture={drive.markEdited}>
+    <div className="flex h-dvh min-w-0 flex-col overflow-hidden" onInputCapture={drive.markEdited} onClickCapture={async event => {
+      drive.markEdited()
+      if (driveSource || localFileName || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+      const link = (event.target as HTMLElement).closest('a')
+      if (!link || !link.getAttribute('href')?.startsWith('/') || link.target === '_blank') return
+      event.preventDefault()
+      event.stopPropagation()
+      clearTimeout(saveTimerRef.current)
+      try { await persistDocument(state); router.push(link.getAttribute('href')!) }
+      catch { setSaveError('Chưa lưu được văn bản. Vui lòng thử lưu lại trước khi rời trang.') }
+    }} onPasteCapture={drive.markEdited}>
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-5 py-2 text-xs text-slate-700">
-        <a href="/dashboard" className="font-semibold text-blue-700">← Văn bản</a>
-        <a href="/documents/local" className="rounded border border-slate-300 px-3 py-2 font-semibold">Mở file từ máy</a>
+        <Link href="/dashboard" className="font-semibold text-blue-700">← Văn bản</Link>
+        <Link href="/documents/local" className="rounded border border-slate-300 px-3 py-2 font-semibold">Mở file từ máy</Link>
         <button disabled={fileSaving} onClick={() => { void handleSaveAs() }} className="rounded bg-blue-700 px-3 py-2 font-semibold text-white disabled:opacity-50">{fileSaving ? 'Đang lưu file...' : 'File Save As'}</button>
         {localFileName && <span role="status" className="min-w-0 flex-1 break-words">{localFileName} · {fileDirty ? 'Chưa lưu bản chỉnh sửa vào máy' : 'Đã lưu vào máy'}</span>}
-        <a href="/profile" className="ml-auto font-semibold text-blue-700">Hồ sơ người dùng</a>
+        <Link href="/profile" className="ml-auto font-semibold text-blue-700">Hồ sơ người dùng</Link>
+        {!driveSource && !localFileName && <span role="status">{saveError ? 'Chưa lưu được' : savedState === JSON.stringify(state) ? (storageMode === 'browser' ? 'Đã lưu trên trình duyệt' : 'Đã lưu vào tài khoản') : 'Đang chờ lưu…'}</span>}
         {fileError && <p role="alert" className="w-full text-red-700">{fileError}</p>}
       </div>
       {driveSource && <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-5 py-2 text-xs text-[#1a1f36]">
@@ -384,6 +410,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
       </EditorWorkspace>
 
       {/* Toast */}
+      {saveError && <div role="alert" className="fixed bottom-16 right-6 z-50 max-w-md rounded-xl bg-red-50 p-4 text-sm text-red-700 shadow-lg">{saveError}</div>}
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1a1f36] text-white text-sm font-semibold px-5 py-2.5 rounded-lg shadow-lg z-50 animate-fade-in">
           {toast}
