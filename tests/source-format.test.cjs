@@ -530,11 +530,53 @@ test('87003 regression: header textbox PAGE field and body line shapes are not t
   const outputXml = await exported.file('word/document.xml').async('string')
   assert.ok(!outputXml.includes('<undefined'), 'generated drawings must not have a nameless XML wrapper')
   const outputDocument = new dom.window.DOMParser().parseFromString(outputXml, 'application/xml')
-  for (const drawing of outputDocument.getElementsByTagName('w:drawing')) assert.equal(drawing.parentElement.tagName, 'w:r', 'drawing must be a direct run child accepted by Microsoft Word')
+  for (const drawing of outputDocument.getElementsByTagName('w:drawing')) {
+    assert.equal(drawing.parentElement.tagName, 'mc:Choice')
+    assert.equal(drawing.parentElement.getAttribute('Requires'), 'wps')
+    const alternate = drawing.parentElement.parentElement
+    assert.equal(alternate.parentElement.tagName, 'w:r', 'alternate drawing representations belong inside a Word run')
+    const fallback = alternate.getElementsByTagName('v:line')[0]
+    assert.ok(fallback, 'renderers without Word 2010 shape support need a VML line')
+    assert.equal(fallback.getAttribute('strokecolor'), '#000000')
+    assert.ok(fallback.getAttribute('to').endsWith('pt,0'))
+  }
   for (const cell of outputDocument.getElementsByTagName('w:tc')) assert.ok(Array.from(cell.children).some(node => node.localName === 'p' || node.localName === 'tbl'), 'every Word cell must have block content')
   const reopened = await load('src/lib/import-docx.ts').importDocx(await blob.arrayBuffer(), 'Saved.docx')
   assert.equal(reopened.sourceHeader[0].runs[0].field, 'PAGE')
-  assert.ok(load('src/lib/source-administrative.ts').sourceDocumentBlocks(reopened)[0].cellParagraphs[0][0][0].rules.length)
+  assert.equal(load('src/lib/source-administrative.ts').sourceDocumentBlocks(reopened)[0].cellParagraphs[0][0][0].rules.length, 1, 'a compatibility fallback must not duplicate the line on import')
+})
+
+test('motto borders survive opening, editing, Drive validation and re-exporting Word templates', async () => {
+  for (const docType of ['bien-ban', 'cong-van']) {
+    const { load } = harness()
+    const { DEFAULT_DOCUMENT_STATE } = load('src/types/index.ts')
+    const exportDocx = load('src/components/document-editor/exportDocx.ts').createDocxBlob
+    const importDocx = load('src/lib/import-docx.ts').importDocx
+    const normalize = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument
+    const blocksFor = load('src/lib/source-administrative.ts').sourceDocumentBlocks
+    const original = await exportDocx({ ...DEFAULT_DOCUMENT_STATE, docType, agencyMain: 'CƠ QUAN', docSummary: 'Về nội dung kiểm thử', mainContent: 'Nội dung văn bản trước khi chỉnh sửa.' })
+    const state = normalize(await importDocx(await original.arrayBuffer(), 'Document.docx'))
+    const borders = blocks => blocks.flatMap(block => block.type === 'paragraph' ? block.bottomBorder ? [block.bottomBorder] : [] : block.type === 'table' ? borders(block.cellParagraphs.flat(2)) : [])
+    const before = borders(blocksFor(state))
+    assert.ok(before.length > 0, 'the paragraph border below the motto must be imported')
+    if (docType === 'cong-van') {
+      const header = blocksFor(state)[0]
+      assert.ok(header.sourceWidth > 500, 'a 100% header table must retain page width instead of the placeholder grid width')
+      assert.deepEqual(header.columnWidths, [48, 52])
+    }
+    const edited = { ...state, mainContentBlocks: [{ type: 'paragraph', text: 'Nội dung văn bản đã chỉnh sửa.' }] }
+    const restored = load('src/lib/drive-document.ts').validateDriveDocument(JSON.parse(JSON.stringify(edited)))
+    assert.deepEqual(borders(blocksFor(restored)), before)
+    const html = require('react-dom/server').renderToStaticMarkup(require('react').createElement(load('src/components/document-editor/SourceDocumentPreview.tsx').default, { state: restored }))
+    assert.match(html, /border-top:0.75pt solid #000000/)
+    const saved = await exportDocx(restored)
+    const zip = await JSZip.loadAsync(await saved.arrayBuffer())
+    const xml = await zip.file('word/document.xml').async('string')
+    assert.match(xml, /<w:pBdr><w:bottom[^>]*w:val="single"/)
+    const reopened = normalize(await importDocx(await saved.arrayBuffer(), 'Saved.docx'))
+    assert.deepEqual(borders(blocksFor(reopened)), before)
+    assert.ok(reopened.mainContent.includes('đã chỉnh sửa'))
+  }
 })
 
 test('embedded header images resolve against header relationships rather than body relationships', async () => {

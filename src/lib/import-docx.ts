@@ -145,7 +145,14 @@ export async function importDocx(arrayBuffer: ArrayBuffer, name: string): Promis
       const color = line && Array.from(line.getElementsByTagName('*')).find(item => item.localName === 'srgbClr')?.getAttribute('val')
       return { width: Number(extent?.getAttribute('cx')) / 12700, left: Number(position('positionH')) / 12700, top: Number(position('positionV')) / 12700, weight: Number(line?.getAttribute('w') || 12700) / 12700, color: color && /^[0-9a-f]{6}$/i.test(color) ? color : '000000' }
     })
-    return { type: 'paragraph', text: runs.map(run => run.text).join(''), style, runs, ...(rules.length ? { rules } : {}) }
+    const bottom = child(child(p, 'pBdr'), 'bottom')
+    const borderColor = val(bottom, 'color') || '000000'
+    const bottomBorder = bottom && val(bottom) === 'single' ? {
+      weight: Math.min(12, Math.max(0.25, Number(val(bottom, 'sz') || 6) / 8)),
+      color: /^[0-9a-f]{6}$/i.test(borderColor) ? borderColor : '000000',
+      space: Math.min(31, Math.max(0, Number(val(bottom, 'space') || 0))),
+    } : undefined
+    return { type: 'paragraph', text: runs.map(run => run.text).join(''), style, runs, ...(rules.length ? { rules } : {}), ...(bottomBorder ? { bottomBorder } : {}) }
   }
   function table(element: Element): MainContentTableBlock {
     const grid = child(element, 'tblGrid')
@@ -177,8 +184,25 @@ export async function importDocx(arrayBuffer: ArrayBuffer, name: string): Promis
       }
     }
     const total = widths.reduce((sum, width) => sum + width, 0)
+    const declaredWidth = child(tblPr, 'tblW')
+    const percent = (width: Element | undefined) => {
+      const value = val(width, 'w') || ''
+      return val(width, 'type') === 'pct' ? value.endsWith('%') ? Number(value.slice(0, -1)) / 100 : Number(value) / 5000 : 0
+    }
+    const percentWidth = percent(declaredWidth)
+    // Percentage tables may have a placeholder grid (e.g. 100 twips per
+    // column). Using that grid as the physical width collapses the header
+    // and leaves no room for its inset motto border on the next export.
+    const tableWidth = percentWidth > 0 ? contentWidth * percentWidth : total
+    const firstCells = children(children(element, 'tr')[0], 'tc')
+    const percentages = firstCells.map(cell => {
+      const props = child(cell, 'tcPr'), width = child(props, 'tcW')
+      return (Number(val(child(props, 'gridSpan'))) || 1) === 1 ? percent(width) : 0
+    })
+    const columnWeights = percentWidth > 0 && percentages.length === count && percentages.every(value => value > 0) ? percentages : widths
+    const weightTotal = columnWeights.reduce((sum, width) => sum + width, 0)
     const align = val(child(tblPr, 'jc'))
-    return { type: 'table', rows, merges: merges.filter(item => item.colSpan > 1 || item.rowSpan > 1), cellParagraphs, cellStyles, fontSize: defaultStyle.fontSize, borderless: !visibleBorder(borders || inheritedBorders) && !cellBordersVisible, ...(['left', 'center', 'right'].includes(align || '') ? { tableAlign: align as MainContentTableBlock['tableAlign'] } : {}), ...(total ? { columnWidths: widths.map(width => width / total * 100), sourceWidth: total * 4 / 3 } : {}) }
+    return { type: 'table', rows, merges: merges.filter(item => item.colSpan > 1 || item.rowSpan > 1), cellParagraphs, cellStyles, fontSize: defaultStyle.fontSize, borderless: !visibleBorder(borders || inheritedBorders) && !cellBordersVisible, ...(['left', 'center', 'right'].includes(align || '') ? { tableAlign: align as MainContentTableBlock['tableAlign'] } : {}), ...(weightTotal ? { columnWidths: columnWeights.map(width => width / weightTotal * 100), sourceWidth: tableWidth * 4 / 3 } : {}) }
   }
   const section = child(body, 'sectPr'), size = child(section, 'pgSz'), margin = child(section, 'pgMar')
   const sourceLayout = { width: Number(val(size, 'w')) / 20 || 595.3, height: Number(val(size, 'h')) / 20 || 841.9, top: number(val(margin, 'top'), 1 / 20) ?? 56.7, bottom: number(val(margin, 'bottom'), 1 / 20) ?? 56.7, left: number(val(margin, 'left'), 1 / 20) ?? 85, right: number(val(margin, 'right'), 1 / 20) ?? 42.5, header: number(val(margin, 'header'), 1 / 20) ?? 28.35, footer: number(val(margin, 'footer'), 1 / 20) ?? 28.35, differentFirstPage: toggle(child(section, 'titlePg')) || false }

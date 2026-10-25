@@ -32,7 +32,17 @@ function sourceRule(rule: NonNullable<MainContentParagraphBlock['rules']>[number
       ])])]),
     ]),
   ])
-  return new TextRun({ children: [drawing] })
+  // Older Word/Drive renderers need a VML fallback for Word 2010 shapes.
+  const fallback = node('w:pict', {}, [node('v:line', {
+    'xmlns:v': 'urn:schemas-microsoft-com:vml', 'xmlns:o': 'urn:schemas-microsoft-com:office:office',
+    id: `SourceLine${ruleId++}`, from: '0,0', to: `${rule.width}pt,0`,
+    style: `position:absolute;margin-left:${rule.left}pt;margin-top:${rule.top}pt;mso-position-horizontal-relative:text;mso-position-vertical-relative:text`,
+    strokecolor: `#${rule.color}`, strokeweight: `${rule.weight}pt`, 'o:allowincell': 't',
+  })])
+  return new TextRun({ children: [node('mc:AlternateContent', { 'xmlns:mc': 'http://schemas.openxmlformats.org/markup-compatibility/2006' }, [
+    node('mc:Choice', { 'xmlns:wps': 'http://schemas.microsoft.com/office/word/2010/wordprocessingShape', Requires: 'wps' }, [drawing]),
+    node('mc:Fallback', {}, [fallback]),
+  ])] })
 }
 function paragraph(p: MainContentParagraphBlock, keepNext = false, keepLines = false) {
   const s = p.style || {}
@@ -43,6 +53,7 @@ function paragraph(p: MainContentParagraphBlock, keepNext = false, keepLines = f
     ...(keepLines ? { keepLines: true, keepNext } : {}),
     indent: { left: (s.left || 0) * 20, right: (s.right || 0) * 20, ...(s.firstLine && s.firstLine < 0 ? { hanging: -s.firstLine * 20 } : { firstLine: (s.firstLine || 0) * 20 }) },
     spacing: { before: (s.before || 0) * 20, after: (s.after || 0) * 20, line: s.line ? s.line * 20 : (s.lineMultiple || 1) * 240, lineRule: s.line ? LineRuleType.EXACT : LineRuleType.AUTO },
+    ...(p.bottomBorder ? { border: { bottom: { style: BorderStyle.SINGLE, size: Math.round(p.bottomBorder.weight * 8), color: p.bottomBorder.color, space: p.bottomBorder.space } } } : {}),
     children: [...(runs || []).flatMap(run => run.text.split('\n').map((text, i) => {
       const style = { ...s, ...run.style }
       return new TextRun({ ...(run.field ? { children: [run.field === 'PAGE' ? PageNumber.CURRENT : PageNumber.TOTAL_PAGES] } : { text }), ...(i ? { break: 1 } : {}), font: style.fontFamily || 'Times New Roman', size: Math.round((style.fontSize || 11) * 2), characterSpacing: style.characterSpacing === undefined ? undefined : Math.round(style.characterSpacing * 20), bold: style.bold, italics: style.italic, ...(style.underline ? { underline: {} } : {}) })

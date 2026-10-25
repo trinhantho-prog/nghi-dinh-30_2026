@@ -6,6 +6,7 @@ export type MainContentParagraphBlock = {
   style?: SourceTextStyle
   runs?: { text: string; style?: SourceTextStyle; field?: 'PAGE' | 'NUMPAGES' }[]
   rules?: { width: number; left: number; top: number; weight: number; color: string }[]
+  bottomBorder?: { weight: number; color: string; space: number }
 }
 
 export type SourceTextStyle = {

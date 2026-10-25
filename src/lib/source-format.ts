@@ -18,6 +18,12 @@ export function sourceParagraph(value: unknown): MainContentParagraphBlock {
   const input = value as Record<string, unknown>
   if (typeof input.text !== 'string') throw new Error('Đoạn văn nguồn không hợp lệ.')
   const style = sourceTextStyle(input.style)
+  let bottomBorder: MainContentParagraphBlock['bottomBorder']
+  if (input.bottomBorder !== undefined) {
+    const border = input.bottomBorder as NonNullable<MainContentParagraphBlock['bottomBorder']>
+    if (!border || typeof border.weight !== 'number' || !Number.isFinite(border.weight) || border.weight <= 0 || border.weight > 12 || typeof border.space !== 'number' || !Number.isFinite(border.space) || border.space < 0 || border.space > 31 || !/^[0-9a-f]{6}$/i.test(border.color)) throw new Error('Đường viền đoạn văn nguồn không hợp lệ.')
+    bottomBorder = { weight: border.weight, color: border.color, space: border.space }
+  }
   const rules = Array.isArray(input.rules) && input.rules.length <= 100 ? input.rules.map(rule => {
     if (!rule || !['width', 'left', 'top', 'weight'].every(key => typeof rule[key] === 'number' && Number.isFinite(rule[key]) && Math.abs(rule[key]) <= 2500) || rule.width <= 0 || rule.weight <= 0 || !/^[0-9a-f]{6}$/i.test(rule.color)) throw new Error('Đường kẻ nguồn không hợp lệ.')
     return { width: rule.width, left: rule.left, top: rule.top, weight: rule.weight, color: rule.color }
@@ -26,7 +32,7 @@ export function sourceParagraph(value: unknown): MainContentParagraphBlock {
     if (!run || typeof run.text !== 'string') throw new Error('Định dạng chữ nguồn không hợp lệ.')
     return { text: run.text, style: sourceTextStyle(run.style), ...(run.field === 'PAGE' || run.field === 'NUMPAGES' ? { field: run.field } : {}) }
   }) : undefined
-  return { type: 'paragraph', text: input.text, ...(style ? { style } : {}), ...(rules ? { rules } : {}), ...(runs?.map(run => run.text).join('') === input.text ? { runs } : {}) }
+  return { type: 'paragraph', text: input.text, ...(style ? { style } : {}), ...(rules ? { rules } : {}), ...(bottomBorder ? { bottomBorder } : {}), ...(runs?.map(run => run.text).join('') === input.text ? { runs } : {}) }
 }
 
 export function sourcePageLayout(value: unknown): SourcePageLayout {
