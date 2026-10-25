@@ -55,7 +55,7 @@ export function extractAdministrativeContent(input: MainContentBlock[], summaryH
       else fields.date = ''
       found = true
     }
-    const summary = text.match(/(?:^|\n)\s*(?:V\s*\/\s*v|Về việc)\s*[:：]?\s*(.+)/iu)
+    const summary = text.match(/(?:^|\n)\s*(?:V\s*\/\s*v|Về việc)\s*[:：]?\s*([^\n]+(?:\n(?!\s*(?:Số\s*:|Kính gửi\s*:|[^\n,]+,\s*ngày))[^\n]+)*)/iu)
     if (summary) { fields.docSummary = clean(summary[1]); fields.docType = 'cong-van'; found = true }
     return found
   }
@@ -72,7 +72,11 @@ export function extractAdministrativeContent(input: MainContentBlock[], summaryH
         const combined = row.join('\n')
         const first = row[0] || ''
         if (isNational(combined)) {
-          if (!isNational(first)) agencies(first.split('\n').filter(line => !/^\s*Số\s*:|^\s*V\s*\/\s*v/iu.test(line)))
+          if (!isNational(first)) {
+            const lines = first.split('\n')
+            const summaryStart = lines.findIndex(line => /^\s*(?:V\s*\/\s*v|Về việc)\b/iu.test(line))
+            agencies((summaryStart < 0 ? lines : lines.slice(0, summaryStart)).filter(line => !/^\s*Số\s*:/iu.test(line)))
+          }
           row.forEach(metadata)
           consumed++
         } else if (!combined.trim() || row.every(cell => !cell.trim() || metadata(cell) || /^[-_—\s]+$/.test(cell))) consumed++

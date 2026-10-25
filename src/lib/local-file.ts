@@ -1,5 +1,6 @@
 import { type DocumentState } from '@/types'
 import { importedHtmlToDocument } from './drive-document'
+import { normalizeImportedDocument } from './normalize-imported-document'
 
 export const LOCAL_FILE_LIMIT = 20 * 1024 * 1024
 
@@ -13,11 +14,11 @@ export async function importLocalFile(file: File): Promise<DocumentState> {
     if (!response.ok) throw new Error(result.error || 'Không thể nhập file .doc.')
     if (typeof result.text !== 'string') throw new Error('Dữ liệu nhập file .doc không hợp lệ.')
     const html = result.text.split(/\r\n|\r|\n/).map((line: string) => `<p>${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`).join('')
-    return importedHtmlToDocument(html, file.name)
+    return normalizeImportedDocument(await importedHtmlToDocument(html, file.name))
   }
   try {
     const { importDocx } = await import('./import-docx')
-    return await importDocx(await file.arrayBuffer(), file.name)
+    return normalizeImportedDocument(await importDocx(await file.arrayBuffer(), file.name))
   } catch (error) {
     throw new Error(`Không thể nhập file Word: ${error instanceof Error ? error.message : 'File bị hỏng hoặc không đúng định dạng .docx.'}`)
   }

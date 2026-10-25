@@ -39,6 +39,72 @@ async function fixture() {
   return zip.generateAsync({ type: 'arraybuffer' })
 }
 
+test('local DOCX opens in the new-document template and exports A4 with template margins', async () => {
+  const { load } = harness()
+  const bytes = await fixture()
+  const state = await load('src/lib/local-file.ts').importLocalFile(new File([bytes], 'Cảnh báo.docx'))
+  assert.equal(state.sourceLayout, undefined)
+  assert.equal(state.sourceSections, undefined)
+  assert.equal(state.agencyMain, 'BẢO HIỂM XÃ HỘI CƠ SỞ CAO LÃNH')
+  assert.equal(state.docSummary, 'cảnh báo chi phí KCB BHYT\ntăng cao 9 tháng đầu năm 2026')
+  assert.equal(state.recipient, 'Trung tâm Y tế Khu vực Cao Lãnh 2')
+  assert.ok(!state.mainContent.includes('CỘNG HÒA'))
+  assert.ok(!state.mainContent.includes('Kính gửi:'))
+  assert.ok(state.mainContent.includes('Thực hiện quy định'))
+  const table = state.mainContentBlocks.find(block => block.type === 'table')
+  assert.equal(table.fontSize, 14)
+  assert.equal(table.sourceWidth, undefined)
+  assert.equal(table.cellStyles[0][0].fontSize, 14)
+  assert.deepEqual(table.merges[0], { row: 0, column: 0, colSpan: 1, rowSpan: 2 })
+  const normalize = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument
+  assert.deepEqual(normalize(state), state, 'reopening a normalized Drive snapshot is stable')
+  const React = require('react')
+  const preview = require('react-dom/server').renderToStaticMarkup(React.createElement(load('src/components/document-editor/A4Preview.tsx').default, { state }))
+  assert.match(preview, /padding:20mm 15mm 20mm 30mm/)
+  const blob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(state)
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer())
+  const xml = await zip.file('word/document.xml').async('string')
+  const doc = new dom.window.DOMParser().parseFromString(xml, 'application/xml')
+  const margins = doc.getElementsByTagName('w:pgMar')[0]
+  const freshBlob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(load('src/types/index.ts').DEFAULT_DOCUMENT_STATE)
+  const freshZip = await JSZip.loadAsync(await freshBlob.arrayBuffer())
+  const freshDoc = new dom.window.DOMParser().parseFromString(await freshZip.file('word/document.xml').async('string'), 'application/xml')
+  assert.equal(margins.outerHTML, freshDoc.getElementsByTagName('w:pgMar')[0].outerHTML)
+  assert.equal(doc.getElementsByTagName('w:pgSz')[0].outerHTML, freshDoc.getElementsByTagName('w:pgSz')[0].outerHTML)
+  assert.match(xml, /Times New Roman/)
+})
+
+test('normalizing an older Drive snapshot keeps edits, images and structured fields', async () => {
+  const { load } = harness()
+  const source = await load('src/lib/import-docx.ts').importDocx(await fixture(), 'Drive.docx')
+  source.agencyMain = 'CƠ QUAN ĐÃ SỬA'
+  source.recipient = 'ĐƠN VỊ ĐÃ SỬA'
+  const image = { type: 'image', src: 'data:image/png;base64,AAAA', width: 100, height: 50, alt: 'Biểu đồ' }
+  source.mainContentBlocks.push(image)
+  source.sourceFooter = [{ type: 'paragraph', text: '1', runs: [{ text: '1', field: 'PAGE' }] }]
+  const normalize = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument
+  const state = normalize(source)
+  assert.equal(state.agencyMain, 'CƠ QUAN ĐÃ SỬA')
+  assert.equal(state.recipient, 'ĐƠN VỊ ĐÃ SỬA')
+  assert.deepEqual(state.mainContentBlocks.at(-1), image)
+  assert.equal(state.sourceFooter, undefined)
+  const structured = { ...state, legalBasis: 'Căn cứ được giữ nguyên', conclusion: 'Kết luận riêng./.', docType: 'bien-ban' }
+  const reopened = normalize(structured)
+  assert.equal(reopened.legalBasis, structured.legalBasis)
+  assert.equal(reopened.conclusion, structured.conclusion)
+  assert.equal(reopened.mainContentBlocks.find(block => block.type === 'table').fontSize, 13)
+})
+
+test('Google Docs HTML uses the same administrative template without duplicating its header', async () => {
+  const { load } = harness()
+  const imported = await load('src/lib/drive-document.ts').importedHtmlToDocument('<p>ỦY BAN NHÂN DÂN</p><p>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p><p>Độc lập - Tự do - Hạnh phúc</p><h1>BÁO CÁO</h1><h2>Về kết quả thực hiện</h2><p>Nội dung báo cáo</p>', 'Drive')
+  const state = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument(imported)
+  assert.equal(state.docType, 'bao-cao')
+  assert.equal(state.docSummary, 'Về kết quả thực hiện')
+  assert.equal(state.mainContent, 'Nội dung báo cáo')
+  assert.equal(state.sourceLayout, undefined)
+})
+
 test('imports source header, both summary lines, page margins and compact merged tables', async () => {
   const { load } = harness()
   const state = await load('src/lib/import-docx.ts').importDocx(await fixture(), 'Cảnh báo.docx')

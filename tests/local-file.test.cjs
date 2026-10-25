@@ -12,6 +12,7 @@ function load(window = {}, importDocx = async () => ({}), fetch = async () => { 
     if (name === '@/types') return { DEFAULT_DOCUMENT_STATE: { docType: 'cong-van' } }
     if (name === './drive-document') return { importedHtmlToDocument: async (html, name) => ({ html, name }) }
     if (name === './import-docx') return { importDocx }
+    if (name === './normalize-imported-document') return { normalizeImportedDocument: state => ({ ...state, normalized: true }) }
     throw new Error(`Unexpected module: ${name}`)
   }
   new Function('require', 'module', 'exports', 'window', 'fetch', compiled)(requireMock, compiledModule, compiledModule.exports, window, fetch)
@@ -28,6 +29,7 @@ test('DOC imports extracted Vietnamese text safely and keeps the source name', a
   })
   const result = await importLocalFile(file)
   assert.equal(result.name, file.name)
+  assert.equal(result.normalized, true)
   assert.equal(result.html, '<p>Tiếng Việt</p><p>&lt;script&gt;alert(1)&lt;/script&gt; &amp; chữ</p>')
 })
 
@@ -43,12 +45,12 @@ test('rejects unsupported, empty and oversized files', async () => {
   await assert.rejects(importLocalFile({ name: 'large.docx', size: LOCAL_FILE_LIMIT + 1 }), /20 MB/)
 })
 
-test('DOCX uses the source-format importer with the original file bytes', async () => {
+test('DOCX parses the original file bytes and applies the administrative template', async () => {
   let buffer
   const { importLocalFile } = load({}, async (input, name) => { buffer = input; return { sourceLayout: true, name } })
   const result = await importLocalFile(new File(['test docx'], 'test.DOCX'))
   assert.ok(buffer instanceof ArrayBuffer)
-  assert.deepEqual(result, { sourceLayout: true, name: 'test.DOCX' })
+  assert.deepEqual(result, { sourceLayout: true, name: 'test.DOCX', normalized: true })
 })
 
 test('malformed Word errors are surfaced to the user', async () => {
