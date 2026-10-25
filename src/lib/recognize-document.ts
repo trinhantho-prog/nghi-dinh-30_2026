@@ -8,6 +8,7 @@ const isMotto = (text: string) => compact(text).includes('doclaptudohanhphuc')
 const clean = (text: string) => text.trim().replace(/[.;:]+$/, '').trim()
 const isHeading = (text: string) => /^(?:(?:[IVXLCDM]+|\d+)\s*[.)\-–—]|PHẦN\s+(?:[IVXLCDM]+|\d+)(?=\s|[.:]|$)|(?:Căn cứ|Kính gửi)(?=\s|:|$))/iu.test(text)
 const isUpper = (text: string) => /\p{L}/u.test(text) && text.toLocaleUpperCase('vi') === text
+const isMinutesOpening = (text: string) => /^(?:Hôm nay|Vào (?:hồi|lúc)|Thời gian|Địa điểm|Thành phần|Chúng tôi)(?=[\s,:：]|$)/iu.test(text)
 const organization = /^(?:BẢO HIỂM XÃ HỘI|ỦY BAN|UỶ BAN|HỘI ĐỒNG|SỞ|PHÒNG|BỘ|CỤC|CHI CỤC|TRƯỜNG|BỆNH VIỆN|VĂN PHÒNG|BAN|ĐẢNG|CÔNG TY)(?=\s|$)/iu
 
 function titleType(text: string): DocType | undefined {
@@ -103,15 +104,28 @@ export function extractAdministrativeContent(input: MainContentBlock[], summaryH
   }
   if (agencyLines.length) agencies(agencyLines)
   const title = blocks[index]
+  const titleFound = title?.type === 'paragraph' && Boolean(titleType(title.text))
   if (title?.type === 'paragraph' && titleType(title.text)) {
     fields.docType = titleType(title.text)
     fields.docSummary = ''
     index++
     const summary: string[] = []
-    while (index < blocks.length && summary.length < 6 && fold(clean(title.text)) !== 'bien ban lam viec') {
+    // Minutes can have a sentence-case subtitle ending with a centered number.
+    // Require that number before accepting plain text, so the opening of the
+    // minutes ("Hôm nay...", participants, etc.) is not mistaken for a subtitle.
+    let minutesNumber = -1
+    if (fields.docType === 'bien-ban') {
+      for (let i = index; i < Math.min(blocks.length, index + 12); i++) {
+        const candidate = blocks[i]
+        if (candidate.type !== 'paragraph' || isHeading(candidate.text) || titleType(candidate.text) || isMinutesOpening(candidate.text)) break
+        if (/^Số\s*[:：]/iu.test(candidate.text)) { minutesNumber = i; break }
+      }
+    }
+    while (index < blocks.length && summary.length < (minutesNumber >= 0 ? 12 : 6) && (minutesNumber >= 0 || fold(clean(title.text)) !== 'bien ban lam viec')) {
       const block = blocks[index]
       if (block.type !== 'paragraph' || isHeading(block.text) || titleType(block.text) || /^Số\s*[:：]/iu.test(block.text)) break
-      if (!isUpper(block.text) && !summaryHints.has(block.text) && !/^Về(?=\s|$)/iu.test(block.text)) break
+      if (fields.docType === 'bien-ban' && isMinutesOpening(block.text)) break
+      if (minutesNumber < 0 && !isUpper(block.text) && !summaryHints.has(block.text) && !/^Về(?=\s|$)/iu.test(block.text)) break
       summary.push(clean(block.text)); index++
     }
     fields.docSummary = summary.join(' ')
@@ -121,11 +135,12 @@ export function extractAdministrativeContent(input: MainContentBlock[], summaryH
       const block = blocks[index]
       if (block.type !== 'paragraph' || !/^Số\s*:/iu.test(block.text)) break
       metadata(block.text)
+      if (fields.docType === 'bien-ban' && summary.length) fields.docSummary += `\n${block.text.trim()}`
       index++
     }
   }
   const footer = extractDocumentFooter(blocks.slice(index), fields.docType || fallbackDocType)
-  return { fields: { ...fields, ...footer.fields }, blocks: footer.blocks, headerFound, footerFound: footer.footerFound }
+  return { fields: { ...fields, ...footer.fields }, blocks: footer.blocks, headerFound, titleFound, footerFound: footer.footerFound }
 }
 
 export function recognizeImportedDocument(blocks: MainContentBlock[], name: string, summaryHints?: Set<string>): DocumentState {
@@ -137,7 +152,7 @@ export function repairImportedDocument(state: DocumentState): DocumentState {
   if (state.sourceLayout) return state
   const blocks = state.mainContentBlocks || state.mainContent.split('\n').map(text => ({ type: 'paragraph' as const, text }))
   const result = extractAdministrativeContent(blocks, new Set(), state.docType)
-  if (!result.headerFound && !result.footerFound) return state
+  if (!result.headerFound && !result.titleFound && !result.footerFound) return state
   // A structured snapshot may already have a user-edited conclusion. A lone closing
   // sentence in its body is not enough evidence to replace that separate field.
   if (!result.headerFound && result.fields.signPosition === undefined && state.conclusion?.trim() && result.fields.conclusion !== undefined) return state

@@ -16,8 +16,8 @@ export function organizeSourceDocument(state: DocumentState): DocumentState {
     const result = extractDocumentFooter([blocks[i]], state.docType)
     if (result.footerFound && result.fields.signPosition) { footer = i; break }
   }
-  if (header < 0 && footer < 0) return state
   const recognized = extractAdministrativeContent(blocks)
+  if (header < 0 && footer < 0) return recognized.titleFound ? { ...state, ...recognized.fields } : state
   let openingEnd = header < 0 ? 0 : header + 1
   while (openingEnd && openingEnd < blocks.length) {
     const block = blocks[openingEnd]

@@ -34,10 +34,22 @@ export function normalizeImportedDocument(input: DocumentState): DocumentState {
   if (input.sourceLayout) {
     let state = input
     {
-      const blocks = state.mainContentBlocks || []
+      let blocks = state.mainContentBlocks || []
+      let opening = input.sourceSections?.opening || []
+      // Older snapshots moved BIÊN BẢN into the opening but left its lowercase
+      // subtitle in the body. Recover it only while the summary is still empty
+      // and unchanged by the user.
+      if (opening.length && !input.docSummary && input.sourceSections?.baseline.docSummary === input.docSummary) {
+        const combined = [...opening, ...blocks]
+        const recovered = extractAdministrativeContent(combined)
+        if (recovered.fields.docType === 'bien-ban' && /\nSố\s*[:：]/iu.test(recovered.fields.docSummary || '')) {
+          blocks = combined
+          opening = []
+        }
+      }
       const hints = new Set(blocks.flatMap(block => block.type === 'paragraph' && (block.style?.bold || block.runs?.every(run => run.style?.bold)) ? block.text.split('\n').map(text => text.trim()) : []))
       const result = extractAdministrativeContent(blocks, hints, input.docType)
-      if (result.headerFound || result.footerFound) {
+      if (result.headerFound || result.titleFound || result.footerFound) {
         // Recognition drops typography, so map body boundaries to original blocks.
         const matches = (original: MainContentBlock, recognized: MainContentBlock) => original === recognized || (original.type === 'paragraph' && recognized.type === 'paragraph' && original.text.split('\n').some(line => line.trim() === recognized.text.trim()))
         const first = result.blocks[0], last = result.blocks.at(-1)
@@ -60,7 +72,7 @@ export function normalizeImportedDocument(input: DocumentState): DocumentState {
             ...fields,
             mainContentBlocks: blocks.slice(start, end),
             sourceSections: {
-              opening: [...(input.sourceSections?.opening || []), ...blocks.slice(0, start)],
+              opening: [...opening, ...blocks.slice(0, start)],
               closing: [...blocks.slice(end), ...(input.sourceSections?.closing || [])],
               baseline: { ...Object.fromEntries(Object.entries(fields).flatMap(([key, value]) => typeof value === 'string' ? [[key, value]] : [])), ...input.sourceSections?.baseline },
             },

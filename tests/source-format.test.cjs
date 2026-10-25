@@ -211,6 +211,47 @@ test('centered minutes titles and the following document number retain their ori
   }
 })
 
+test('minutes DOCX without a national header fills type and sentence-case summary while retaining centered source text', async () => {
+  const { load } = harness()
+  const zip = await JSZip.loadAsync(await fixture())
+  const description = 'xác định số vượt dự kiến chi khám chữa bệnh được quỹ Bảo hiểm y tế thanh toán năm 2024 của Trung tâm Y tế khu vực Cao Lãnh 2, (Mã cơ sở KCB: 87003)'
+  const centered = '<w:jc w:val="center"/><w:ind w:firstLine="0"/>'
+  const opening = p('BIÊN BẢN',28,centered,'<w:b/>') + p(description,26,centered) + p('Số: 01_2024/BB',26,centered,'<w:b/>')
+  const body = 'Hôm nay, chúng tôi tiến hành xác định số vượt dự kiến chi.'
+  zip.file('word/document.xml', `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${opening}${p(body,26)}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:bottom="1134" w:left="1440" w:right="720"/></w:sectPr></w:body></w:document>`)
+  const original = await load('src/lib/import-docx.ts').importDocx(await zip.generateAsync({type:'arraybuffer'}), '87003.docx')
+  assert.equal(original.docType, 'bien-ban')
+  const normalize = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument
+  const state = normalize(original)
+  assert.equal(state.docType, 'bien-ban')
+  assert.equal(state.docSummary, `${description}\nSố: 01_2024/BB`)
+  assert.equal(state.mainContent, body)
+  assert.deepEqual(state.sourceSections.opening, original.mainContentBlocks.slice(0, 3))
+  assert.deepEqual(normalize(state), state)
+  const legacy = {
+    ...state, docSummary: '',
+    mainContentBlocks: original.mainContentBlocks.slice(1),
+    sourceSections: { ...state.sourceSections, opening: original.mainContentBlocks.slice(0, 1), baseline: { ...state.sourceSections.baseline, docSummary: '' } },
+  }
+  const repaired = normalize(legacy)
+  assert.equal(repaired.docSummary, state.docSummary)
+  assert.equal(repaired.mainContent, body)
+  assert.deepEqual(repaired.sourceSections.opening, state.sourceSections.opening)
+  assert.equal(normalize({ ...legacy, docSummary: 'Trích yếu người dùng đã sửa' }).docSummary, 'Trích yếu người dùng đã sửa')
+  const restored = load('src/lib/drive-document.ts').validateDriveDocument(JSON.parse(JSON.stringify(state)))
+  assert.equal(restored.docType, 'bien-ban')
+  assert.equal(restored.docSummary, state.docSummary)
+  const blob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(restored)
+  const output = await JSZip.loadAsync(await blob.arrayBuffer())
+  const xml = new dom.window.DOMParser().parseFromString(await output.file('word/document.xml').async('string'), 'application/xml')
+  const paragraphs = Array.from(xml.getElementsByTagName('w:p'))
+  for (const text of ['BIÊN BẢN', description, 'Số: 01_2024/BB']) {
+    const matches = paragraphs.filter(node => node.textContent === text)
+    assert.equal(matches.length, 1)
+    assert.equal(matches[0].getElementsByTagName('w:jc')[0].getAttribute('w:val'), 'center')
+  }
+})
+
 test('cell fonts apply to selected merged cells and survive Drive validation, preview and both Word export paths', async () => {
   const { load } = harness()
   const { formatTableCellFont } = load('src/lib/table-layout.ts')

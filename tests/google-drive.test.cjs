@@ -230,6 +230,31 @@ test('Recognize number, symbol, complete date, and cong van summary', () => {
   assert.equal(state.mainContent, 'Đề nghị các đơn vị phối hợp thực hiện.')
 })
 
+test('Minutes recognize sentence-case descriptions and include the following number in the summary', () => {
+  const { recognizeImportedDocument, repairImportedDocument } = harness().load('src/lib/recognize-document.ts')
+  const description = 'xác định số vượt dự kiến chi khám chữa bệnh được quỹ Bảo hiểm y tế thanh toán năm 2024 của Trung tâm Y tế khu vực Cao Lãnh 2, (Mã cơ sở KCB: 87003)'
+  const blocks = ['BIÊN BẢN', description, 'Số: 01_2024/BB', 'Hôm nay, chúng tôi tiến hành làm việc.', 'I. NỘI DUNG', 'Giữ nguyên nội dung biên bản.'].map(text => ({ type: 'paragraph', text }))
+  const state = recognizeImportedDocument(blocks, '87003.docx')
+  assert.equal(state.docType, 'bien-ban')
+  assert.equal(state.docSummary, `${description}\nSố: 01_2024/BB`)
+  assert.equal(state.docNumber, '01_2024')
+  assert.equal(state.docSymbol, 'BB')
+  assert.deepEqual(state.mainContentBlocks, blocks.slice(3))
+  const repaired = repairImportedDocument({ ...state, docType: 'cong-van', docSummary: '87003', mainContentBlocks: blocks })
+  assert.equal(repaired.docType, 'bien-ban')
+  assert.equal(repaired.docSummary, state.docSummary)
+  assert.deepEqual(repairImportedDocument(repaired), repaired)
+})
+
+test('Minutes keep opening body text out of the summary even if a number appears later', () => {
+  const { recognizeImportedDocument } = harness().load('src/lib/recognize-document.ts')
+  const body = ['Hôm nay, chúng tôi tiến hành làm việc.', 'Số: 01/BB', 'Nội dung thảo luận.'].map(text => ({ type: 'paragraph', text }))
+  const state = recognizeImportedDocument([{ type: 'paragraph', text: 'BIÊN BẢN' }, ...body], 'Minutes.docx')
+  assert.equal(state.docType, 'bien-ban')
+  assert.equal(state.docSummary, '')
+  assert.deepEqual(state.mainContentBlocks, body)
+})
+
 test('Recognize plain paragraph headers and keep Roman body headings', () => {
   const h = harness()
   const { recognizeImportedDocument } = h.load('src/lib/recognize-document.ts')
