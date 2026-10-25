@@ -39,12 +39,13 @@ async function fixture() {
   return zip.generateAsync({ type: 'arraybuffer' })
 }
 
-test('local DOCX opens in the new-document template and exports A4 with template margins', async () => {
+test('local DOCX normalizes body paragraphs while preserving the original opening, tables and page geometry', async () => {
   const { load } = harness()
   const bytes = await fixture()
   const state = await load('src/lib/local-file.ts').importLocalFile(new File([bytes], 'Cảnh báo.docx'))
-  assert.equal(state.sourceLayout, undefined)
-  assert.equal(state.sourceSections, undefined)
+  const source = await load('src/lib/import-docx.ts').importDocx(bytes, 'Cảnh báo.docx')
+  assert.deepEqual(state.sourceLayout, source.sourceLayout)
+  assert.deepEqual(state.sourceSections, source.sourceSections)
   assert.equal(state.agencyMain, 'BẢO HIỂM XÃ HỘI CƠ SỞ CAO LÃNH')
   assert.equal(state.docSummary, 'cảnh báo chi phí KCB BHYT\ntăng cao 9 tháng đầu năm 2026')
   assert.equal(state.recipient, 'Trung tâm Y tế Khu vực Cao Lãnh 2')
@@ -52,21 +53,26 @@ test('local DOCX opens in the new-document template and exports A4 with template
   assert.ok(!state.mainContent.includes('Kính gửi:'))
   assert.ok(state.mainContent.includes('Thực hiện quy định'))
   const table = state.mainContentBlocks.find(block => block.type === 'table')
-  assert.equal(table.fontSize, 14)
-  assert.equal(table.sourceWidth, undefined)
-  assert.equal(table.cellStyles[0][0].fontSize, 14)
+  assert.deepEqual(table, source.mainContentBlocks.find(block => block.type === 'table'))
+  assert.equal(table.cellStyles[0][0].fontSize, 9)
+  const body = state.mainContentBlocks.find(block => block.text?.startsWith('Thực hiện'))
+  assert.equal(body.style.fontSize, 14)
+  assert.equal(body.runs[0].style.fontSize, 14)
+  assert.equal(body.style.line, 18)
+  assert.deepEqual(state.mainContentBlocks.find(block => block.text?.startsWith('Đơn vị')), source.mainContentBlocks.find(block => block.text?.startsWith('Đơn vị')))
   assert.deepEqual(table.merges[0], { row: 0, column: 0, colSpan: 1, rowSpan: 2 })
   const normalize = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument
   assert.deepEqual(normalize(state), state, 'reopening a normalized Drive snapshot is stable')
   const React = require('react')
   const preview = require('react-dom/server').renderToStaticMarkup(React.createElement(load('src/components/document-editor/A4Preview.tsx').default, { state }))
-  assert.match(preview, /padding:20mm 15mm 20mm 30mm/)
+  assert.match(preview, /font-size:9pt/)
+  assert.match(preview, /font-size:14pt/)
   const blob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(state)
   const zip = await JSZip.loadAsync(await blob.arrayBuffer())
   const xml = await zip.file('word/document.xml').async('string')
   const doc = new dom.window.DOMParser().parseFromString(xml, 'application/xml')
   const margins = doc.getElementsByTagName('w:pgMar')[0]
-  const freshBlob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(load('src/types/index.ts').DEFAULT_DOCUMENT_STATE)
+  const freshBlob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(source)
   const freshZip = await JSZip.loadAsync(await freshBlob.arrayBuffer())
   const freshDoc = new dom.window.DOMParser().parseFromString(await freshZip.file('word/document.xml').async('string'), 'application/xml')
   assert.equal(margins.outerHTML, freshDoc.getElementsByTagName('w:pgMar')[0].outerHTML)
@@ -87,12 +93,36 @@ test('normalizing an older Drive snapshot keeps edits, images and structured fie
   assert.equal(state.agencyMain, 'CƠ QUAN ĐÃ SỬA')
   assert.equal(state.recipient, 'ĐƠN VỊ ĐÃ SỬA')
   assert.deepEqual(state.mainContentBlocks.at(-1), image)
-  assert.equal(state.sourceFooter, undefined)
+  assert.deepEqual(state.sourceFooter, source.sourceFooter)
   const structured = { ...state, legalBasis: 'Căn cứ được giữ nguyên', conclusion: 'Kết luận riêng./.', docType: 'bien-ban' }
   const reopened = normalize(structured)
   assert.equal(reopened.legalBasis, structured.legalBasis)
   assert.equal(reopened.conclusion, structured.conclusion)
-  assert.equal(reopened.mainContentBlocks.find(block => block.type === 'table').fontSize, 13)
+  assert.deepEqual(reopened.mainContentBlocks.find(block => block.type === 'table'), source.mainContentBlocks.find(block => block.type === 'table'))
+})
+
+test('both table and paragraph signature layouts retain original typography through normalization and export', async () => {
+  for (const tableSignature of [true, false]) {
+    const { load } = harness()
+    const zip = await JSZip.loadAsync(await fixture())
+    const recipient = p('Nơi nhận:', 22, '<w:jc w:val="left"/>', '<w:b/><w:i/>') + p('- Như trên;', 22) + p('- Giám đốc BHXH cơ sở;', 22) + p('- Lưu: VT, CĐBHYT.', 22)
+    const signer = p('GIÁM ĐỐC', 26, '<w:jc w:val="center"/>', '<w:b/>') + p('', 26) + p('Đoàn Văn Đồng', 26, '<w:jc w:val="center"/>', '<w:b/>')
+    const footer = tableSignature ? `<w:tbl><w:tblGrid><w:gridCol w:w="4500"/><w:gridCol w:w="4500"/></w:tblGrid><w:tr><w:tc>${recipient}</w:tc><w:tc>${signer}</w:tc></w:tr></w:tbl>` : recipient + signer
+    zip.file('word/document.xml', (await zip.file('word/document.xml').async('string')).replace('<w:sectPr>', `${footer}<w:sectPr>`))
+    const original = await load('src/lib/import-docx.ts').importDocx(await zip.generateAsync({ type: 'arraybuffer' }), 'Giữ định dạng.docx')
+    const normalize = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument
+    const normalized = normalize(original)
+    const sourceBlocks = load('src/lib/source-administrative.ts').sourceDocumentBlocks
+    const protectedBlocks = blocks => blocks.filter(block => block.type === 'table' || (block.type === 'paragraph' && /^(?:Nơi nhận:|- |GIÁM ĐỐC|Đoàn Văn Đồng)/u.test(block.text)))
+    assert.deepEqual(protectedBlocks(sourceBlocks(normalized)), protectedBlocks(sourceBlocks(original)))
+    assert.deepEqual(normalize(normalized), normalized)
+    const exported = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(normalized)
+    const reopened = await load('src/lib/import-docx.ts').importDocx(await exported.arrayBuffer(), 'Đã lưu.docx')
+    const allText = sourceBlocks(reopened).map(block => block.type === 'table' ? block.rows.flat().join('\n') : block.text || '').join('\n')
+    assert.equal((allText.match(/Nơi nhận:/g) || []).length, 1)
+    assert.equal((allText.match(/Đoàn Văn Đồng/g) || []).length, 1)
+    assert.equal(reopened.signName, 'Đoàn Văn Đồng')
+  }
 })
 
 test('Google Docs HTML uses the same administrative template without duplicating its header', async () => {

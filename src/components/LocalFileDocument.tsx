@@ -20,7 +20,7 @@ export default function LocalFileDocument() {
       <Link href="/dashboard" className="text-sm text-blue-700">← Danh sách văn bản</Link>
       <h1 className="text-xl font-bold">Mở file từ máy tính</h1>
       <p className="text-sm leading-relaxed">Chọn file Word (.docx hoặc .doc), tối đa 20 MB. Sau khi chỉnh sửa, dùng “File Save As” để đặt tên và lưu bản Word (.docx) vào máy tính.</p>
-      <p className="text-sm text-slate-600">File được tự động chỉnh theo mẫu Nghị định 30 giống khi tạo văn bản mới: khổ A4, lề, phông chữ, căn đoạn và bố cục hành chính. Ứng dụng nhận diện thông tin cơ quan, trích yếu, nơi nhận và chữ ký để điền vào phần soạn thảo. File .doc chỉ nhập nội dung chữ; file .docx giữ nội dung, bảng, ô gộp và ảnh (ảnh trong ô được đặt sau bảng). Hãy kiểm tra bản xem trước trước khi lưu.</p>
+      <p className="text-sm text-slate-600">Tự động chuẩn hóa các đoạn nội dung theo mẫu Nghị định 30. Với file .docx, đầu văn bản, nơi nhận/chữ ký, các bảng và dòng đơn vị tính được giữ định dạng gốc, gồm cỡ chữ, căn lề, độ rộng cột và ô gộp. Khổ trang và lề gốc được giữ để bảo toàn bố cục các phần này. File .doc chỉ nhập nội dung chữ; ảnh trong ô bảng của file .docx được đặt sau bảng. Hãy kiểm tra bản xem trước trước khi lưu.</p>
       <input ref={input} type="file" accept=".docx,.doc" className="sr-only" aria-label="Chọn file Word trên máy tính" disabled={busy} onChange={async event => {
         const file = event.target.files?.[0]
         event.target.value = ''
