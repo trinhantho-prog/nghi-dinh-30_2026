@@ -154,3 +154,11 @@ Tham khảo [biến môi trường Vercel](https://vercel.com/docs/environment-v
 - Kiểm tra sau triển khai: vào Local Mode → tạo văn bản → sửa trích yếu/nội dung → về danh sách → tải lại → mở lại → xóa → tải lại để xác nhận không xuất hiện lại. Kiểm tra thêm lưu/xóa với tài khoản Google thật sau khi chạy SQL. Trạng thái chưa lưu sẽ giữ trên màn hình khi thao tác gặp lỗi.
 
 Kiểm thử hồi quy: `node --test tests/document-persistence.test.cjs tests/user-editor-config.test.cjs tests/local-file.test.cjs tests/google-login.test.cjs`; build: `npm run build`.
+
+### Khôi phục khi dashboard báo lỗi máy chủ
+
+Trang danh sách, tạo và mở văn bản hiển thị thông báo khôi phục nếu kho Supabase hoặc cấu hình tài khoản chưa tải được, thay vì làm hỏng cả trang. Nút **Thử lại** tải lại dữ liệu. Nếu thiếu schema hoặc RPC, phần hướng dẫn thiết lập nêu các file SQL cần kiểm tra; không coi lỗi tải kho là một danh sách văn bản trống.
+
+Nút **Dùng kho trên trình duyệt này** là lựa chọn chủ động của người dùng: đặt tùy chọn `document_storage=browser` và mở lại dashboard. Không di chuyển hoặc xóa dữ liệu tài khoản; văn bản cục bộ chỉ nằm trên thiết bị này. Nút **Mở kho tài khoản** bỏ tùy chọn này. Đăng nhập Google thành công và đăng xuất cũng xóa tùy chọn để tránh giữ nhầm chế độ. Cài đặt người ký/cơ quan và mở file Google Drive không còn phụ thuộc vào bảng kho văn bản.
+
+Kiểm thử: `node --test tests/document-load.test.cjs tests/document-persistence.test.cjs tests/google-login.test.cjs tests/user-editor-config.test.cjs`.

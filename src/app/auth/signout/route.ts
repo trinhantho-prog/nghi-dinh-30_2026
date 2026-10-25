@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
   }
   const store = await cookies()
   store.set('local_mode', '', { path: '/', maxAge: 0 })
+  store.set('document_storage', '', { path: '/', maxAge: 0 })
   store.set(DRIVE_COOKIE, '', { ...driveCookieOptions, maxAge: 0 })
   const origin = request.nextUrl.origin
   return NextResponse.redirect(new URL('/login', origin), { status: 303 })

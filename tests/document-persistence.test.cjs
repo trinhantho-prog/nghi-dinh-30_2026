@@ -78,7 +78,7 @@ test('corrupt storage is not overwritten; folder changes and version deletion pe
 function cloudHarness() {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'test'
-  const context = { error: null, data: { id: 'existing-document' }, user: { id: 'account-a' }, authError: null, tenantId: 'tenant-a', provisionError: null, calls: [] }
+  const context = { error: null, data: { id: 'existing-document' }, user: { id: 'account-a' }, authError: null, tenantId: 'tenant-a', provisionError: null, browser: false, configError: false, calls: [] }
   const supabase = {
     rpc: async name => { context.calls.push({ operation: 'rpc', name }); return { data: 'personal-tenant', error: context.provisionError } },
     auth: { getUser: async () => ({ data: { user: context.user }, error: context.authError }) },
@@ -96,8 +96,8 @@ function cloudHarness() {
   const actions = compile('lib/actions/documents.ts', {
     '@/lib/supabase/server': { createClient: async () => supabase },
     'next/cache': { revalidatePath: () => {} },
-    'next/headers': { cookies: async () => ({ get: () => ({ value: 'true' }) }) },
-    '@/lib/user-editor-config': { getEditorConfig: async () => ({ agencies: [], signers: [] }), saveEditorConfig: async value => value },
+    'next/headers': { cookies: async () => ({ get: name => name === 'local_mode' ? { value: 'true' } : context.browser && name === 'document_storage' ? { value: 'browser' } : undefined }) },
+    '@/lib/user-editor-config': { getEditorConfig: async () => { if (context.configError) throw new Error('Account settings unavailable'); return { agencies: [], signers: [] } }, saveEditorConfig: async value => value },
   })
   return { ...actions, context }
 }
@@ -142,4 +142,18 @@ test('accounts without a membership provision their own workspace; missing migra
   assert.ok(h.context.calls.some(call => call.operation === 'insert' && call.args[0].tenant_id === 'personal-tenant'))
   h.context.provisionError = new Error('Function missing')
   await assert.rejects(h.saveDocument(state), /20261025_document_workspace.sql/)
+})
+
+test('an explicit browser workspace works with an existing cloud login and unavailable account settings', async () => {
+  const h = cloudHarness()
+  h.context.browser = true
+  h.context.authError = new Error('Auth outage')
+  h.context.configError = true
+  const library = await h.getDocuments()
+  assert.equal(library.storageMode, 'browser')
+  assert.deepEqual(library.documents, [])
+  assert.deepEqual(library.agencies, [])
+  assert.equal(h.context.calls.length, 0)
+  assert.equal((await h.getDocument('doc_local')).storageMode, 'browser')
+  await assert.rejects(h.saveDocument(state), /trình duyệt/)
 })

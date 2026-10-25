@@ -8,6 +8,8 @@ import { cookies } from 'next/headers'
 import { getEditorConfig, saveEditorConfig } from '@/lib/user-editor-config'
 
 async function documentSession() {
+  // An explicit device workspace must not depend on Supabase being reachable.
+  if ((await cookies()).get('document_storage')?.value === 'browser') return null
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)) return null
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
@@ -75,7 +77,7 @@ export async function deleteDocument(documentId: string) {
 
 export async function getDocuments() {
   const session = await documentSession()
-  const config = await getEditorConfig()
+  const config = await documentEditorConfig()
   if (!session) return { documents: [] as LocalDocumentRecord[], documentCount: 0, storageMode: 'browser' as const, ...config }
   const { supabase, tenantId } = await cloudSession()
   const { data, error } = await supabase.from('documents').select('id, title, doc_type, updated_at, created_at, content').eq('tenant_id', tenantId).order('updated_at', { ascending: false })
@@ -86,7 +88,7 @@ export async function getDocuments() {
 
 export async function getDocument(documentId: string) {
   const session = await documentSession()
-  const config = await getEditorConfig()
+  const config = await documentEditorConfig()
   if (!session) return { document: null as LocalDocumentRecord | null, versions: [] as LocalDocVersionRecord[], documentCount: 0, storageMode: 'browser' as const, ...config }
   const { supabase, tenantId } = await cloudSession()
   const [document, versions] = await Promise.all([
@@ -95,6 +97,16 @@ export async function getDocument(documentId: string) {
   ])
   if (document.error || versions.error) throw new Error('Không tải được văn bản hoặc lịch sử phiên bản. Vui lòng thử lại.')
   return { document: document.data as LocalDocumentRecord | null, versions: (versions.data ?? []) as LocalDocVersionRecord[], documentCount: 0, storageMode: 'cloud' as const, ...config }
+}
+
+async function documentEditorConfig() {
+  try { return await getEditorConfig() }
+  catch (error) {
+    // Explicit browser mode can still edit documents when account settings are
+    // unavailable. Never inherit another account's server-side defaults.
+    if ((await cookies()).get('document_storage')?.value === 'browser') return { agencies: [], signers: [] }
+    throw error
+  }
 }
 
 export async function renameFolder(oldName: string, newName: string) {

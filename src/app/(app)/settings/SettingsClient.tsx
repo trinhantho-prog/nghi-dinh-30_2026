@@ -9,7 +9,7 @@ import AIConfiguration from '@/components/AIConfiguration'
 interface Props {
   agencies: Agency[]
   signers: Signer[]
-  documentCount: number
+  documentCount?: number
 }
 
 export default function SettingsClient({ agencies: initAgencies, signers: initSigners, documentCount }: Props) {
@@ -74,7 +74,7 @@ export default function SettingsClient({ agencies: initAgencies, signers: initSi
           <h2 className="text-sm font-bold text-[#7b8abf] uppercase tracking-wide mb-3">Thống kê sử dụng</h2>
           <div className="flex gap-6">
             <div>
-              <div className="text-2xl font-bold text-[#1a56b0]">{documentCount}<span className="text-base font-normal text-[#6b7597]">/1000</span></div>
+              <div className="text-2xl font-bold text-[#1a56b0]">{documentCount ?? '—'}<span className="text-base font-normal text-[#6b7597]">/1000</span></div>
               <div className="text-xs text-[#6b7597]">Văn bản</div>
             </div>
           </div>

@@ -27,7 +27,7 @@ test('new Google users reach their profile and leave local mode after code excha
   const h = callback()
   const response = await h.GET(new Request('https://app.example/auth/callback?code=test'))
   assert.equal(response.headers.get('location'), 'https://app.example/profile')
-  assert.deepEqual(h.deleted, ['local_mode'])
+  assert.deepEqual(h.deleted, ['local_mode', 'document_storage'])
   assert.deepEqual(h.filters, [['user_id', 'google-user']])
 })
 

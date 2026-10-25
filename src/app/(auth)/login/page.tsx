@@ -39,6 +39,7 @@ function LoginForm() {
 
   function enterLocalMode() {
     document.cookie = 'local_mode=true; path=/; max-age=31536000'
+    document.cookie = 'document_storage=browser; path=/; max-age=31536000; SameSite=Lax'
     router.push('/dashboard')
     router.refresh()
   }

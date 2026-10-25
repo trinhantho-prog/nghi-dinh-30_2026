@@ -14,6 +14,7 @@ export async function GET(request: Request) {
       if (!error) {
         const cookieStore = await cookies()
         cookieStore.delete('local_mode')
+        cookieStore.delete('document_storage')
 
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {

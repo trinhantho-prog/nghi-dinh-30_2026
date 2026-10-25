@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { renameFolder, deleteFolder } from '@/lib/actions/documents'
 import DeleteDocumentButton from './DeleteDocumentButton'
 import { getBrowserDocuments, renameBrowserFolder } from '@/lib/storage/browser-documents'
+import { DocumentStorageModeButton } from '@/components/DocumentStorageRecovery'
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   'cong-van': 'Công Văn',
@@ -281,7 +282,7 @@ export default function DashboardClient({
 
   return (
     <div style={dashboardBg} className="min-h-screen font-sans antialiased text-[#1d1d1f]">
-      {storageMode === 'browser' && <p className="bg-blue-50 px-8 py-2 text-sm text-blue-800">Văn bản cục bộ được lưu trên trình duyệt và thiết bị này. Dùng File Save As để sao lưu file Word.</p>}
+      {storageMode === 'browser' && <div className="flex flex-wrap items-center gap-3 bg-blue-50 px-8 py-2 text-sm text-blue-800"><p>Văn bản cục bộ được lưu trên trình duyệt và thiết bị này. Dùng File Save As để sao lưu file Word.</p><DocumentStorageModeButton browser /></div>}
       {storageError && <p role="alert" className="bg-red-50 px-8 py-2 text-sm text-red-700">{storageError}</p>}
       {/* Sleek Top nav with frosted glass effect */}
       <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-[#e0e0e0]/40 px-8 py-3.5 flex flex-wrap gap-3 items-center justify-between transition-all duration-300">

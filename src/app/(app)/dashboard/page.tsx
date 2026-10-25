@@ -1,12 +1,15 @@
-import { getDocuments } from '@/lib/actions/documents'
+import { loadDocumentLibrary } from '@/lib/document-load'
+import DocumentStorageRecovery from '@/components/DocumentStorageRecovery'
 import { createClient } from '@/lib/supabase/server'
 import DashboardClient from './DashboardClient'
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ profileSaved?: string }> }) {
   const { profileSaved } = await searchParams
-  const { documents, documentCount, storageMode } = await getDocuments()
+  const result = await loadDocumentLibrary()
+  if (!result.ok) return <DocumentStorageRecovery {...result.error} />
+  const { documents, documentCount, storageMode } = result.data
   let userEmail: string | undefined
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
+  if (storageMode === 'cloud' && process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
     try {
       const supabase = await createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -17,7 +20,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   return (
     <DashboardClient
       storageMode={storageMode}
-      documents={documents as any}
+      documents={documents}
       documentCount={documentCount}
       tenantName="Thể thức văn bản"
       profileSaved={profileSaved === '1'}

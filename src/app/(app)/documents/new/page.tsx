@@ -1,5 +1,6 @@
 import DocumentEditor from '@/components/document-editor'
-import { getDocuments } from '@/lib/actions/documents'
+import { loadDocumentLibrary } from '@/lib/document-load'
+import DocumentStorageRecovery from '@/components/DocumentStorageRecovery'
 
 interface PageProps {
   searchParams: Promise<{ folder?: string }>
@@ -7,7 +8,9 @@ interface PageProps {
 
 export default async function NewDocumentPage({ searchParams }: PageProps) {
   const { folder } = await searchParams
-  const { agencies, signers, documentCount, storageMode } = await getDocuments()
+  const result = await loadDocumentLibrary()
+  if (!result.ok) return <DocumentStorageRecovery {...result.error} />
+  const { agencies, signers, documentCount, storageMode } = result.data
 
   return (
     <DocumentEditor
