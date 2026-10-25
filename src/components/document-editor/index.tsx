@@ -317,13 +317,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
         {drive.warning && <p role="alert" className="mt-1 text-amber-800">{drive.warning}</p>}
       </div>}
       <EditorWorkspace state={state} sidebar={
-      state.sourceLayout && !state.sourceSections ? <div className="flex h-full flex-col gap-4 overflow-auto border-r border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">
-        <h2 className="font-bold text-blue-800">Giữ bố cục file gốc</h2>
-        <p>Khổ trang, lề, đầu trang, chữ ký và định dạng bảng được lấy từ tài liệu đã mở.</p>
-        <p>Chỉnh sửa đầu trang, nội dung và chữ ký trực tiếp trong các đoạn văn và ô bảng ở phần soạn thảo.</p>
-        <button onClick={handleSaveVersion} disabled={drive.isSaving || fileSaving} className="rounded bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-60">{drive.isSaving || fileSaving ? 'Đang lưu...' : driveSource ? 'Lưu Google Drive' : 'File Save As'}</button>
-        <button onClick={handleNewDocument} className="rounded border border-slate-300 px-4 py-2">Tạo văn bản mới theo mẫu</button>
-      </div> : <Sidebar
+      <Sidebar
         state={state}
         dispatch={dispatch}
         agencies={agencies.length > 0 ? agencies : [{ upper: state.agencyUpper, main: state.agencyMain, location: state.location }]}

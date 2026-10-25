@@ -293,6 +293,72 @@ test('cell fonts apply to selected merged cells and survive Drive validation, pr
   assert.equal(resized.cellStyles[0][0].fontSize,12)
 })
 
+test('imported documents allow deleting empty paragraphs, including the final one, and adding a paragraph again', async () => {
+  const React = require('react')
+  const { load } = harness(undefined, {
+    ...React,
+    useMemo: callback => callback(), useRef: current => ({ current }),
+    useState: initial => [initial, () => {}], useEffect: () => {},
+  })
+  const { DEFAULT_DOCUMENT_STATE } = load('src/types/index.ts')
+  const normalize = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument
+  const source = await load('src/lib/import-docx.ts').importDocx(await fixture(), 'Delete.docx')
+  const table = source.mainContentBlocks.find(block => block.type === 'table')
+  let state = normalize({ ...DEFAULT_DOCUMENT_STATE, sourceLayout: source.sourceLayout, mainContentBlocks: [{ type: 'paragraph', text: '' }, table, { type: 'paragraph', text: '' }] })
+  function elements(node) {
+    if (!React.isValidElement(node)) return []
+    return [node, ...React.Children.toArray(node.props.children).flatMap(elements)]
+  }
+  const render = () => elements(load('src/components/document-editor/MainContentEditor.tsx').default({ state, editorRef: { current: null }, onChange: blocks => { state = normalize({ ...state, mainContentBlocks: blocks, mainContent: load('src/lib/recognize-document.ts').contentBlocksText(blocks) }) } }))
+  render().find(node => node.props['aria-label'] === 'Xóa đoạn văn 1').props.onClick()
+  assert.equal(state.mainContentBlocks.length, 2)
+  assert.deepEqual(state.mainContentBlocks[0], table)
+  render().find(node => node.props['aria-label'] === 'Xóa đoạn văn 2').props.onClick()
+  assert.deepEqual(state.mainContentBlocks, [table])
+  assert.equal(render().filter(node => node.type === 'textarea' && node.props['data-paragraph'] !== undefined).length, 0)
+  state = { ...state, mainContentBlocks: [{ type: 'paragraph', text: '' }], mainContent: '' }
+  render().find(node => node.props['aria-label'] === 'Xóa đoạn văn 1').props.onClick()
+  assert.deepEqual(state.mainContentBlocks, [])
+  assert.equal(render().filter(node => node.type === 'textarea' && node.props['data-paragraph'] !== undefined).length, 0)
+  render().find(node => node.type === 'button' && node.props.children === '+ Thêm đoạn văn').props.onClick()
+  assert.equal(state.mainContentBlocks.length, 1)
+  assert.equal(state.mainContentBlocks[0].text, '')
+})
+
+test('sidebar fields on imported minutes update the preview, Drive state and exported Word', async () => {
+  const { load } = harness()
+  const { DEFAULT_DOCUMENT_STATE } = load('src/types/index.ts')
+  const source = await load('src/lib/import-docx.ts').importDocx(await fixture(), 'Minutes.docx')
+  const normalize = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument
+  const summary = 'Nội dung biên bản ban đầu'
+  const original = normalize({ ...DEFAULT_DOCUMENT_STATE, sourceLayout: source.sourceLayout, mainContentBlocks: [
+    { type: 'paragraph', text: 'BIÊN BẢN', style: { align: 'center', bold: true } },
+    { type: 'paragraph', text: summary, style: { align: 'center' } },
+    { type: 'paragraph', text: 'Số: 01_2024/BB', style: { align: 'center', bold: true } },
+    { type: 'paragraph', text: 'Hôm nay, chúng tôi tiến hành làm việc.' },
+  ] })
+  const values = { docSummary: 'Trích yếu chỉnh sửa\nSố: 01_2024/BB', recipient: 'Trung tâm Y tế khu vực Cao Lãnh 2', legalBasis: 'Căn cứ pháp lý thứ nhất;\nCăn cứ pháp lý thứ hai;', issueStatement: 'Hai bên thống nhất nội dung sau:', conclusion: 'Kết luận và yêu cầu thực hiện.', partyAUnit: 'Đơn vị bên A', partyAPosition: 'Giám đốc bên A', partyAName: 'Nguyễn Văn A', partyBUnit: 'Đơn vị bên B', partyBPosition: 'Giám đốc bên B', partyBName: 'Trần Văn B' }
+  const edited = { ...original, ...values }
+  const state = load('src/lib/drive-document.ts').validateDriveDocument(JSON.parse(JSON.stringify(edited)))
+  const { sourceDocumentBlocks, contentBlocksText } = { ...load('src/lib/source-administrative.ts'), ...load('src/lib/recognize-document.ts') }
+  const text = contentBlocksText(sourceDocumentBlocks(state))
+  for (const value of Object.values(values)) for (const line of value.split('\n')) assert.equal(text.split(line).length - 1, 1, line)
+  assert.ok(!text.includes(summary))
+  assert.ok(text.indexOf(values.legalBasis.split('\n')[0]) < text.indexOf('Hôm nay'))
+  assert.ok(text.indexOf(values.conclusion) > text.indexOf('Hôm nay'))
+  assert.deepEqual(JSON.parse(JSON.stringify(sourceDocumentBlocks(normalize(state)))), JSON.parse(JSON.stringify(sourceDocumentBlocks(state))))
+  const html = require('react-dom/server').renderToStaticMarkup(require('react').createElement(load('src/components/document-editor/A4Preview.tsx').default, { state }))
+  for (const value of Object.values(values)) for (const line of value.split('\n')) assert.ok(html.includes(line), line)
+  const blob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(state)
+  const output = await JSZip.loadAsync(await blob.arrayBuffer())
+  const xml = new dom.window.DOMParser().parseFromString(await output.file('word/document.xml').async('string'), 'application/xml')
+  for (const value of Object.values(values)) for (const line of value.split('\n')) assert.equal(xml.documentElement.textContent.split(line).length - 1, 1, line)
+  const cleared = sourceDocumentBlocks({ ...state, recipient: '', legalBasis: '', issueStatement: '', conclusion: '', partyAUnit: '', partyAPosition: '', partyAName: '', partyBUnit: '', partyBPosition: '', partyBName: '' })
+  const clearedText = contentBlocksText(cleared)
+  assert.ok(!clearedText.includes(values.legalBasis.split('\n')[0]))
+  assert.ok(!clearedText.includes(values.partyAName))
+})
+
 test('DOCX keeps the conclusion and all signature rows together for new documents and imported multi-party minutes', async () => {
   const { load } = harness()
   const defaults = load('src/types/index.ts').DEFAULT_DOCUMENT_STATE

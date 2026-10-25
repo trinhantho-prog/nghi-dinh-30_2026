@@ -27,7 +27,7 @@ export default function MainContentEditor({ state, onChange, editorRef }: Props)
     } else result.push(block)
     return result
   }, []), [state])
-  const content = useMemo<MainContentBlock[]>(() => blocks.length ? blocks : [{ type: 'paragraph', text: '' }], [blocks])
+  const content = useMemo<MainContentBlock[]>(() => blocks.length || state.sourceLayout ? blocks : [{ type: 'paragraph', text: '' }], [blocks, state.sourceLayout])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [size, setSize] = useState({ rows: 3, columns: 3 })
   const [hoverSize, setHoverSize] = useState({ rows: 3, columns: 3 })
@@ -227,7 +227,7 @@ export default function MainContentEditor({ state, onChange, editorRef }: Props)
 
   function removeTable(index: number) {
     const next = content.filter((_, i) => i !== index)
-    onChange(next.length ? next : [{ type: 'paragraph', text: '' }])
+    onChange(next)
     setActiveCell({ block: -1, row: 0, column: 0 })
     setCellSelection(null)
   }
@@ -285,7 +285,14 @@ export default function MainContentEditor({ state, onChange, editorRef }: Props)
       </div>}
       <div ref={editorRef} className="flex-1 overflow-y-auto bg-white/80 p-5" aria-label="Nội dung chính">
         {content.map((block, index) => block.type === 'paragraph' ? (
-          <textarea key={index} data-paragraph={index} aria-label={`Đoạn văn ${index + 1}`} value={block.text}
+          <div key={index} className="group relative mb-2 rounded border border-transparent focus-within:border-blue-200 hover:border-slate-200">
+          <div className="flex justify-end px-2 pt-1"><button type="button" aria-label={`Xóa đoạn văn ${index + 1}`} className={`${buttonClass} text-red-600`} onClick={() => {
+            onChange(content.filter((_, i) => i !== index))
+            selection.current = { block: Math.max(0, index - 1), start: 0, end: 0 }
+            setActiveCell({ block: -1, row: 0, column: 0 })
+            setCellSelection(null)
+          }}>Xóa đoạn</button></div>
+          <textarea data-paragraph={index} aria-label={`Đoạn văn ${index + 1}`} value={block.text}
             rows={Math.max(3, block.text.split('\n').length + 1)}
             onSelect={e => { selection.current = { block: index, start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd } }}
             onFocus={e => { selection.current = { block: index, start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd } }}
@@ -296,6 +303,7 @@ export default function MainContentEditor({ state, onChange, editorRef }: Props)
             }}
             className="block min-h-24 w-full resize-y rounded p-2 text-[0.9rem] leading-relaxed focus:bg-white focus:outline-2 focus:outline-blue-200"
             style={{ fontFamily: '"Times New Roman", Times, serif' }} placeholder="Nhập nội dung chính của văn bản..." />
+          </div>
         ) : block.type === 'image' ? (
           <figure key={index} className="my-3 rounded-lg border border-[#c8d0e8] bg-white p-3" onClick={() => { selection.current = { block: index, start: 0, end: 0 } }}>
             <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
@@ -439,6 +447,10 @@ export default function MainContentEditor({ state, onChange, editorRef }: Props)
             }}>+ Đoạn văn sau bảng</button>
           </section>
         ))}
+        <button type="button" className={`${buttonClass} mt-2`} onClick={() => {
+          pendingImageFocus.current = content.length
+          onChange([...content, { type: 'paragraph', text: '' }])
+        }}>+ Thêm đoạn văn</button>
       </div>
     </div>
   )

@@ -4,7 +4,7 @@ import { extractDocumentFooter } from './recognize-document-footer'
 import { editSourceParagraph } from './source-format'
 
 const compact = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z]/g, '').toLowerCase()
-const fields = ['agencyUpper', 'agencyMain', 'docNumber', 'docSymbol', 'location', 'date', 'dateText', 'docType', 'docSummary', 'recipient', 'signAuthority', 'signPosition', 'signName', 'recipientsCc', 'conclusion'] as const
+const fields = ['agencyUpper', 'agencyMain', 'docNumber', 'docSymbol', 'location', 'date', 'dateText', 'docType', 'docSummary', 'recipient', 'legalBasis', 'issueStatement', 'signAuthority', 'signPosition', 'signName', 'recipientsCc', 'conclusion', 'partyAUnit', 'partyAPosition', 'partyAName', 'partyBUnit', 'partyBPosition', 'partyBName'] as const
 
 export function organizeSourceDocument(state: DocumentState): DocumentState {
   if (!state.sourceLayout || state.sourceSections) return state
@@ -81,10 +81,54 @@ export function sourceDocumentBlocks(state: DocumentState): MainContentBlock[] {
     }
     return { ...block, cellParagraphs: cells, rows: cells.map(row => row.map(paras => paras.map(p => p.text).join('\n'))) }
   })
-  const opening = renderSection(sections.opening, 'opening')
+  const paragraph = (text: string, centered = false): MainContentParagraphBlock => ({ type: 'paragraph', text, style: { fontFamily: 'Times New Roman', fontSize: state.docType === 'bien-ban' ? 13 : 14, align: centered ? 'center' : 'justify', before: 6, after: 6, line: 18, firstLine: centered ? 0 : 36 } })
+  const textKey = (text: string) => text.replace(/\s+/g, ' ').trim()
+  let sourceOpening = sections.opening
+  if (changed('docSummary')) {
+    const summary = textKey(sections.baseline.docSummary || '')
+    let replaced = false
+    if (summary) for (let start = 0; start < sourceOpening.length && !replaced; start++) {
+      let text = ''
+      for (let end = start; end < sourceOpening.length; end++) {
+        const block = sourceOpening[end]
+        if (block.type !== 'paragraph') break
+        text = textKey(`${text} ${block.text}`)
+        if (text === summary) {
+          const originals = sourceOpening.slice(start, end + 1) as MainContentParagraphBlock[]
+          sourceOpening = [...sourceOpening.slice(0, start), ...update(originals, state.docSummary), ...sourceOpening.slice(end + 1)]
+          replaced = true
+          break
+        }
+        if (!summary.startsWith(text)) break
+      }
+    }
+    const tableSummary = sourceOpening.some(block => block.type === 'table' && block.rows.some(row => row.some(text => /^\s*V\s*\/\s*v/iu.test(text))))
+    if (!replaced && !tableSummary && state.docSummary.trim()) sourceOpening = [...sourceOpening, ...state.docSummary.split('\n').map(text => paragraph(text, true))]
+  }
+  const opening = renderSection(sourceOpening, 'opening')
   if (changed('docType') && state.docType !== 'cong-van') {
     const titles = { 'bao-cao': 'BÁO CÁO', 'thong-bao': 'THÔNG BÁO', 'ke-hoach': 'KẾ HOẠCH', 'bien-ban': 'BIÊN BẢN' }
     opening.push({ type: 'paragraph', text: titles[state.docType], style: { fontFamily: 'Times New Roman', fontSize: 14, bold: true, align: 'center', before: 6, after: 6 } })
   }
-  return [...opening, ...(state.mainContentBlocks || []), ...renderSection(sections.closing, 'closing')]
+  const hasText = (blocks: MainContentBlock[], test: (text: string) => boolean) => blocks.some(block => block.type === 'paragraph' ? test(block.text) : block.type === 'table' && block.rows.some(row => row.some(test)))
+  if (changed('recipient') && state.recipient.trim() && !hasText(sections.opening, text => /^\s*Kính gửi\s*:/iu.test(text))) opening.push(paragraph(`Kính gửi: ${state.recipient}`))
+  const additions = (key: 'legalBasis' | 'issueStatement' | 'conclusion') => changed(key) && state[key].trim() ? state[key].split('\n').map(text => paragraph(text)) : []
+  const closing = renderSection(sections.closing, 'closing')
+  const conclusionInSource = Boolean(sections.baseline.conclusion?.trim()) && hasText(sections.closing, text => textKey(text) === textKey(sections.baseline.conclusion))
+  const parties = ['partyAUnit', 'partyAPosition', 'partyAName', 'partyBUnit', 'partyBPosition', 'partyBName'] as const
+  const signatures: MainContentBlock[] = []
+  if (state.docType === 'bien-ban' && changed(...parties) && parties.some(key => state[key].trim())) {
+    const rows = [
+      ['ĐẠI DIỆN BÊN A', 'ĐẠI DIỆN BÊN B'],
+      [state.partyAUnit, state.partyBUnit],
+      [state.partyAPosition, state.partyBPosition],
+      [state.partyAName, state.partyBName],
+    ]
+    const cellParagraphs = rows.map((row, r) => row.map(text => text.split('\n').map(line => {
+      const p = paragraph(line, true)
+      return { ...p, style: { ...p.style, bold: true, ...(r === 3 ? { before: 36 } : {}) } }
+    })))
+    signatures.push({ type: 'table', rows, columnWidths: [50, 50], borderless: true, cellParagraphs })
+  }
+  return [...opening, ...additions('legalBasis'), ...additions('issueStatement'), ...(state.mainContentBlocks || []), ...(conclusionInSource ? [] : additions('conclusion')), ...closing, ...signatures]
 }

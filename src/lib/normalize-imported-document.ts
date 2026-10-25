@@ -86,7 +86,9 @@ export function normalizeImportedDocument(input: DocumentState): DocumentState {
     const numberStyle: SourceTextStyle = { fontFamily: 'Times New Roman', fontSize: 14, align: 'center', before: 0, after: 0, lineMultiple: 1, firstLine: 0 }
     return {
       ...state, mainContentBlocks: blocks, mainContent: contentBlocksText(blocks),
-      ...(state.sourceSections && closing ? { sourceSections: { ...state.sourceSections, closing } } : {}),
+      sourceSections: state.sourceSections && closing ? { ...state.sourceSections, closing } : {
+        opening: [], closing: [], baseline: Object.fromEntries(Object.entries(state).flatMap(([key, value]) => typeof value === 'string' ? [[key, value]] : [])),
+      },
       sourceLayout: { ...state.sourceLayout!, differentFirstPage: true, header: state.sourceLayout!.header || 28.35 },
       sourceHeader: [{ type: 'paragraph', text: '1', style: numberStyle, runs: [{ text: '1', field: 'PAGE', style: numberStyle }] }, ...withoutPageNumbers(state.sourceHeader)],
       ...(state.sourceFooter ? { sourceFooter: withoutPageNumbers(state.sourceFooter) } : {}),
