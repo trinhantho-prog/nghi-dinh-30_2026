@@ -7,7 +7,7 @@ const ts = require('typescript')
 const JSZip = require('jszip')
 const { JSDOM } = require('jsdom')
 const dom = new JSDOM('')
-function harness(decodeImage) {
+function harness(decodeImage, reactOverride) {
   const cache = new Map()
   function load(file) {
     const absolute = path.resolve(__dirname, '..', file)
@@ -16,6 +16,7 @@ function harness(decodeImage) {
     cache.set(absolute, compiledModule)
     const source = ts.transpileModule(fs.readFileSync(absolute, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
     const localRequire = name => {
+      if (name === 'react' && reactOverride) return reactOverride
       if (name.startsWith('@/') || name.startsWith('.')) {
         const base = name.startsWith('@/') ? path.resolve(__dirname, '../src', name.slice(2)) : path.resolve(path.dirname(absolute), name)
         if (base.endsWith(`${path.sep}document-image`) && decodeImage) return { ...load(`${base}.ts`), clipboardImageBlock: decodeImage }
@@ -44,7 +45,7 @@ test('local DOCX normalizes body paragraphs while preserving the original openin
   const bytes = await fixture()
   const state = await load('src/lib/local-file.ts').importLocalFile(new File([bytes], 'Cảnh báo.docx'))
   const source = await load('src/lib/import-docx.ts').importDocx(bytes, 'Cảnh báo.docx')
-  assert.deepEqual(state.sourceLayout, source.sourceLayout)
+  assert.deepEqual(state.sourceLayout, { ...source.sourceLayout, differentFirstPage: true })
   assert.deepEqual(state.sourceSections, source.sourceSections)
   assert.equal(state.agencyMain, 'BẢO HIỂM XÃ HỘI CƠ SỞ CAO LÃNH')
   assert.equal(state.docSummary, 'cảnh báo chi phí KCB BHYT\ntăng cao 9 tháng đầu năm 2026')
@@ -93,7 +94,7 @@ test('normalizing an older Drive snapshot keeps edits, images and structured fie
   assert.equal(state.agencyMain, 'CƠ QUAN ĐÃ SỬA')
   assert.equal(state.recipient, 'ĐƠN VỊ ĐÃ SỬA')
   assert.deepEqual(state.mainContentBlocks.at(-1), image)
-  assert.deepEqual(state.sourceFooter, source.sourceFooter)
+  assert.deepEqual(state.sourceFooter, [], 'the old footer page number is replaced by centered header numbering')
   const structured = { ...state, legalBasis: 'Căn cứ được giữ nguyên', conclusion: 'Kết luận riêng./.', docType: 'bien-ban' }
   const reopened = normalize(structured)
   assert.equal(reopened.legalBasis, structured.legalBasis)
@@ -123,6 +124,54 @@ test('both table and paragraph signature layouts retain original typography thro
     assert.equal((allText.match(/Đoàn Văn Đồng/g) || []).length, 1)
     assert.equal(reopened.signName, 'Đoàn Văn Đồng')
   }
+})
+
+test('normalized Word hides the first page number, numbers subsequent pages and indents the closing paragraph outside the signature', async () => {
+  const { load } = harness()
+  const zip = await JSZip.loadAsync(await fixture())
+  const conclusion = 'Bảo hiểm xã hội cơ sở Cao Lãnh gửi thông tin cảnh báo đến Trung tâm Y tế Khu vực Cao Lãnh 2./.'
+  const footer = `<w:tbl><w:tblGrid><w:gridCol w:w="4500"/><w:gridCol w:w="4500"/></w:tblGrid><w:tr><w:tc>${p('Nơi nhận:',22,'','<w:b/><w:i/>')}${p('- Như trên;',22)}</w:tc><w:tc>${p('GIÁM ĐỐC',26,'<w:jc w:val="center"/>','<w:b/>')}${p('Đoàn Văn Đồng',26,'<w:jc w:val="center"/>','<w:b/>')}</w:tc></w:tr></w:tbl>`
+  zip.file('word/document.xml', (await zip.file('word/document.xml').async('string')).replace('<w:sectPr>', `${p(conclusion,26,'<w:ind w:firstLine="0"/>')}${footer}<w:sectPr>`))
+  const original = await load('src/lib/import-docx.ts').importDocx(await zip.generateAsync({type:'arraybuffer'}), 'Đoạn kết.docx')
+  assert.equal(original.sourceSections.closing.find(block => block.text === conclusion).style.firstLine, 0)
+  const normalize = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument
+  const state = normalize(original)
+  assert.equal(state.sourceSections.closing.find(block => block.text === conclusion).style.firstLine, 36)
+  assert.deepEqual(state.sourceSections.closing.find(block => block.type === 'table'), original.sourceSections.closing.find(block => block.type === 'table'))
+  assert.deepEqual(normalize(state), state)
+  const React = require('react')
+  const html = require('react-dom/server').renderToStaticMarkup(React.createElement(load('src/components/document-editor/A4Preview.tsx').default, {state}))
+  assert.match(html, /text-indent:36pt/)
+  const blob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(state)
+  const output = await JSZip.loadAsync(await blob.arrayBuffer())
+  const parse = xml => new dom.window.DOMParser().parseFromString(xml, 'application/xml')
+  const doc = parse(await output.file('word/document.xml').async('string'))
+  assert.equal(doc.getElementsByTagName('w:titlePg').length, 1)
+  const closing = Array.from(doc.getElementsByTagName('w:p')).find(node => node.textContent === conclusion)
+  assert.equal(closing.getElementsByTagName('w:ind')[0].getAttribute('w:firstLine'), '720')
+  const rels = parse(await output.file('word/_rels/document.xml.rels').async('string'))
+  for (const ref of doc.getElementsByTagName('w:headerReference')) {
+    const rel = Array.from(rels.documentElement.children).find(node => node.getAttribute('Id') === ref.getAttribute('r:id'))
+    const header = await output.file(`word/${rel.getAttribute('Target')}`).async('string')
+    if (ref.getAttribute('w:type') === 'first') assert.ok(!header.includes('PAGE'), 'first page has an explicit blank header')
+    if (ref.getAttribute('w:type') === 'default') {
+      assert.match(header, /PAGE/)
+      assert.match(header, /w:jc w:val="center"/)
+      assert.match(header, /w:sz w:val="28"/)
+    }
+  }
+})
+
+test('reopening a saved source document and adding a paragraph keeps first-line indentation', async () => {
+  let current, reduce
+  const { load } = harness(undefined, { useReducer(reducer, initial, initialize) { reduce = reducer; current = initialize(initial); return [current, () => {}] } })
+  const state = await load('src/lib/import-docx.ts').importDocx(await fixture(), 'Saved.docx')
+  load('src/components/document-editor/useDocumentReducer.ts').useDocumentReducer(state)
+  assert.equal(current.sourceLayout.differentFirstPage, true)
+  const updated = reduce(current, { type: 'SET_CONTENT_BLOCKS', blocks: [...current.mainContentBlocks, {type:'paragraph',text:'Đoạn mới được thêm sau khi mở file'}] })
+  assert.equal(updated.mainContentBlocks.at(-1).style.firstLine, 36)
+  assert.equal(updated.mainContentBlocks.at(-1).style.fontSize, 14)
+  assert.deepEqual(updated.mainContentBlocks.find(block => block.type === 'table'), state.mainContentBlocks.find(block => block.type === 'table'))
 })
 
 test('Google Docs HTML uses the same administrative template without duplicating its header', async () => {

@@ -1,6 +1,19 @@
 import type { DocumentState, MainContentBlock, MainContentParagraphBlock, SourceTextStyle } from '@/types'
 import { contentBlocksText, extractAdministrativeContent, repairImportedDocument } from './recognize-document'
 
+function withoutPageNumbers(blocks: MainContentBlock[] = []): MainContentBlock[] {
+  return blocks.flatMap<MainContentBlock>(block => {
+    if (block.type === 'table' && block.cellParagraphs) {
+      const cellParagraphs = block.cellParagraphs.map((row, r) => row.map((paragraphs, c) => paragraphs.map(p => p.text).join('\n') === block.rows[r][c] ? withoutPageNumbers(paragraphs) as MainContentParagraphBlock[] : paragraphs))
+      return [{ ...block, cellParagraphs, rows: block.rows.map((row, r) => row.map((text, c) => cellParagraphs[r][c] === block.cellParagraphs![r][c] ? text : cellParagraphs[r][c].map(p => p.text).join('\n'))) }]
+    }
+    if (block.type !== 'paragraph' || !block.runs?.some(run => run.field) || block.runs.map(run => run.text).join('') !== block.text) return [block]
+    const runs = block.runs.filter(run => !run.field)
+    const text = runs.map(run => run.text).join('')
+    return text.trim() ? [{ ...block, text, runs }] : []
+  })
+}
+
 function normalizeParagraph(block: MainContentParagraphBlock, fontSize: number): MainContentParagraphBlock {
   // Unit captions belong to the table layout, including their right alignment.
   if (/^\s*(?:Đơn vị(?:\s+(?:tính|tiền))?|ĐVT)\s*:/iu.test(block.text)) return block
@@ -56,7 +69,16 @@ export function normalizeImportedDocument(input: DocumentState): DocumentState {
       }
     }
     const blocks = (state.mainContentBlocks || []).map(block => block.type === 'paragraph' ? normalizeParagraph(block, state.docType === 'bien-ban' ? 13 : 14) : block)
-    return { ...state, mainContentBlocks: blocks, mainContent: contentBlocksText(blocks) }
+    const conclusionLines = new Set([state.conclusion, state.sourceSections?.baseline.conclusion || ''].flatMap(text => text.split('\n').map(line => line.trim())).filter(Boolean))
+    const closing = state.sourceSections?.closing.map(block => block.type === 'paragraph' && (conclusionLines.has(block.text.trim()) || /\.\/\.\s*$/.test(block.text)) ? normalizeParagraph(block, state.docType === 'bien-ban' ? 13 : 14) : block)
+    const numberStyle: SourceTextStyle = { fontFamily: 'Times New Roman', fontSize: 14, align: 'center', before: 0, after: 0, lineMultiple: 1, firstLine: 0 }
+    return {
+      ...state, mainContentBlocks: blocks, mainContent: contentBlocksText(blocks),
+      ...(state.sourceSections && closing ? { sourceSections: { ...state.sourceSections, closing } } : {}),
+      sourceLayout: { ...state.sourceLayout!, differentFirstPage: true, header: state.sourceLayout!.header || 28.35 },
+      sourceHeader: [{ type: 'paragraph', text: '1', style: numberStyle, runs: [{ text: '1', field: 'PAGE', style: numberStyle }] }, ...withoutPageNumbers(state.sourceHeader)],
+      ...(state.sourceFooter ? { sourceFooter: withoutPageNumbers(state.sourceFooter) } : {}),
+    }
   }
 
   // Text-only imports have no original Word layout to retain. Structured Drive
