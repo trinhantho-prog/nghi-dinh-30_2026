@@ -11,8 +11,7 @@ export function useDriveAutosave(state: DocumentState, source?: DriveSource, ini
   const latest = useRef(state)
   const saved = useRef(initialDirty ? '' : JSON.stringify(state))
   const version = useRef(source?.version || '')
-  const editedRef = useRef(initialDirty)
-  const [edited, setEdited] = useState(initialDirty)
+  const [isSaving, setIsSaving] = useState(false)
   const running = useRef<Promise<boolean> | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const blocked = useRef(false)
@@ -20,20 +19,14 @@ export function useDriveAutosave(state: DocumentState, source?: DriveSource, ini
   const [error, setError] = useState('')
   const [warning, setWarning] = useState('')
 
-  const markEdited = useCallback(() => {
-    if (!source || editedRef.current) return
-    saved.current = JSON.stringify(latest.current)
-    editedRef.current = true
-    setEdited(true)
-  }, [source])
-
   const flush = useCallback(async (): Promise<boolean> => {
     clearTimeout(timer.current)
-    if (!source || !editedRef.current) return true
+    if (!source) return true
     if (running.current) return running.current
     if (blocked.current) return false
     const task = async () => {
       try {
+        setIsSaving(true)
         setError('')
         while (JSON.stringify(latest.current) !== saved.current) {
           const snapshot = latest.current
@@ -68,12 +61,12 @@ export function useDriveAutosave(state: DocumentState, source?: DriveSource, ini
       }
     }
     running.current = task()
-    try { return await running.current } finally { running.current = null }
+    try { return await running.current } finally { running.current = null; setIsSaving(false) }
   }, [source])
 
   useEffect(() => {
     latest.current = state
-    if (!source || !edited || JSON.stringify(state) === saved.current) return
+    if (!source || JSON.stringify(state) === saved.current) return
     const serialized = JSON.stringify(state)
     let draftSaved = false
     try { localStorage.setItem(driveDraftKey(source), JSON.stringify({ version: version.current, state: JSON.parse(serialized) })); draftSaved = true } catch { /* Report the missing recovery copy below. */ }
@@ -86,12 +79,12 @@ export function useDriveAutosave(state: DocumentState, source?: DriveSource, ini
     }, 0)
     timer.current = setTimeout(() => { void flush() }, 1500)
     return () => { clearTimeout(notification); clearTimeout(timer.current) }
-  }, [state, source, edited, flush])
+  }, [state, source, flush])
 
   useEffect(() => {
     if (!source) return
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (editedRef.current && JSON.stringify(latest.current) !== saved.current) { event.preventDefault(); event.returnValue = '' }
+      if (JSON.stringify(latest.current) !== saved.current) { event.preventDefault(); event.returnValue = '' }
     }
     const onOnline = () => { void flush() }
     window.addEventListener('beforeunload', onBeforeUnload)
@@ -99,5 +92,5 @@ export function useDriveAutosave(state: DocumentState, source?: DriveSource, ini
     return () => { window.removeEventListener('beforeunload', onBeforeUnload); window.removeEventListener('online', onOnline) }
   }, [source, flush])
 
-  return { status, error, warning, flush, markEdited }
+  return { status, error, warning, flush, isSaving }
 }

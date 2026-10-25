@@ -131,7 +131,10 @@ export default function DocumentEditor({
 
   async function handleSaveVersion() {
     if (localFileName) { await handleSaveAs(); return }
-    if (driveSource) { await drive.flush(); return }
+    if (driveSource) {
+      if (await drive.flush()) showToast('Đã lưu vào Google Drive ✓')
+      return
+    }
     setIsSaving(true)
     try {
       // 1. Always save the document first so it persists in DB (Supabase / local DB)
@@ -289,8 +292,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
   }
 
   return (
-    <div className="flex h-dvh min-w-0 flex-col overflow-hidden" onInputCapture={drive.markEdited} onClickCapture={async event => {
-      drive.markEdited()
+    <div className="flex h-dvh min-w-0 flex-col overflow-hidden" onClickCapture={async event => {
       if (driveSource || localFileName || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
       const link = (event.target as HTMLElement).closest('a')
       if (!link || !link.getAttribute('href')?.startsWith('/') || link.target === '_blank') return
@@ -299,7 +301,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
       clearTimeout(saveTimerRef.current)
       try { await persistDocument(state); router.push(link.getAttribute('href')!) }
       catch { setSaveError('Chưa lưu được văn bản. Vui lòng thử lưu lại trước khi rời trang.') }
-    }} onPasteCapture={drive.markEdited}>
+    }}>
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-5 py-2 text-xs text-slate-700">
         <Link href="/dashboard" className="font-semibold text-blue-700">← Văn bản</Link>
         <Link href="/documents/local" className="rounded border border-slate-300 px-3 py-2 font-semibold">Mở file từ máy</Link>
@@ -310,7 +312,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
         {fileError && <p role="alert" className="w-full text-red-700">{fileError}</p>}
       </div>
       {driveSource && <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-5 py-2 text-xs text-[#1a1f36]">
-        <div className="flex flex-wrap items-center gap-3"><strong className="mr-auto">Google Drive: {driveSource.name}</strong><span role="status">{drive.status}</span><button className="font-semibold text-blue-700 underline" onClick={() => { void drive.flush() }}>Lưu ngay / Thử lại</button><button className="font-semibold text-blue-700 underline" onClick={async () => { if (await drive.flush()) router.push('/drive') }}>← Về Drive</button></div>
+        <div className="flex flex-wrap items-center gap-3"><strong className="mr-auto">Google Drive: {driveSource.name}</strong><span role="status">{drive.status}</span><button disabled={drive.isSaving} className="font-semibold text-blue-700 underline disabled:opacity-60" onClick={handleSaveVersion}>{drive.isSaving ? 'Đang lưu...' : 'Lưu ngay / Thử lại'}</button><button className="font-semibold text-blue-700 underline" onClick={async () => { if (await drive.flush()) router.push('/drive') }}>← Về Drive</button></div>
         {drive.error && <p role="alert" className="mt-1 text-red-700">{drive.error} <a className="underline" href="/api/drive/connect" target="_blank" rel="noopener noreferrer">Kết nối lại Drive</a> · <button className="underline" onClick={() => window.location.reload()}>Mở lại bản trên Drive</button> · Có thể xuất DOCX để giữ bản đang sửa.</p>}
         {drive.warning && <p role="alert" className="mt-1 text-amber-800">{drive.warning}</p>}
       </div>}
@@ -319,7 +321,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
         <h2 className="font-bold text-blue-800">Giữ bố cục file gốc</h2>
         <p>Khổ trang, lề, đầu trang, chữ ký và định dạng bảng được lấy từ tài liệu đã mở.</p>
         <p>Chỉnh sửa đầu trang, nội dung và chữ ký trực tiếp trong các đoạn văn và ô bảng ở phần soạn thảo.</p>
-        <button onClick={handleSaveVersion} className="rounded bg-blue-700 px-4 py-2 font-semibold text-white">{driveSource ? 'Lưu Google Drive' : 'File Save As'}</button>
+        <button onClick={handleSaveVersion} disabled={drive.isSaving || fileSaving} className="rounded bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-60">{drive.isSaving || fileSaving ? 'Đang lưu...' : driveSource ? 'Lưu Google Drive' : 'File Save As'}</button>
         <button onClick={handleNewDocument} className="rounded border border-slate-300 px-4 py-2">Tạo văn bản mới theo mẫu</button>
       </div> : <Sidebar
         state={state}
@@ -332,7 +334,7 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
         versions={versions}
         onLoadVersion={handleLoadVersion}
         onDeleteVersion={handleDeleteVersion}
-        isSaving={isSaving}
+        isSaving={isSaving || drive.isSaving || fileSaving}
         documentCount={documentCount}
         isDriveDocument={Boolean(driveSource)}
         isLocalDocument={Boolean(localFileName)}
