@@ -81,6 +81,40 @@ test('local DOCX normalizes body paragraphs while preserving the original openin
   assert.match(xml, /Times New Roman/)
 })
 
+test('centered body paragraphs retain direct and inherited formatting through local import, Drive reopening, preview and DOCX export', async () => {
+  const { load } = harness()
+  const zip = await JSZip.loadAsync(await fixture())
+  const styles = await zip.file('word/styles.xml').async('string')
+  zip.file('word/styles.xml', styles.replace('</w:styles>', '<w:style w:type="paragraph" w:styleId="Centered"><w:pPr><w:jc w:val="center"/><w:spacing w:before="160" w:after="200"/><w:ind w:firstLine="0"/></w:pPr></w:style></w:styles>'))
+  const xml = await zip.file('word/document.xml').async('string')
+  const texts = ['Nội dung căn giữa trực tiếp', 'Nội dung căn giữa theo kiểu']
+  zip.file('word/document.xml', xml.replace('<w:sectPr>', p(texts[0], 30, '<w:jc w:val="center"/><w:ind w:firstLine="0"/><w:spacing w:before="80" w:after="100"/>', '<w:b/><w:i/>') + p(texts[1], 24, '<w:pStyle w:val="Centered"/>') + '<w:sectPr>'))
+  const bytes = await zip.generateAsync({ type: 'arraybuffer' })
+  const original = await load('src/lib/import-docx.ts').importDocx(bytes, 'Centered.docx')
+  const local = await load('src/lib/local-file.ts').importLocalFile(new File([bytes], 'Centered.docx'))
+  const normalize = load('src/lib/normalize-imported-document.ts').normalizeImportedDocument
+  const drive = normalize(load('src/lib/drive-document.ts').validateDriveDocument(local))
+  for (const state of [local, drive]) {
+    for (const text of texts) {
+      const paragraph = state.mainContentBlocks.find(block => block.text === text)
+      assert.deepEqual(paragraph, original.mainContentBlocks.find(block => block.text === text))
+      assert.equal(paragraph.style.align, 'center')
+      assert.equal(paragraph.style.firstLine, 0)
+    }
+    const React = require('react')
+    const preview = require('react-dom/server').renderToStaticMarkup(React.createElement(load('src/components/document-editor/A4Preview.tsx').default, { state }))
+    assert.match(preview, /text-align:center[^>]*>.*Nội dung căn giữa/s)
+    const blob = await load('src/components/document-editor/exportDocx.ts').createDocxBlob(state)
+    const exported = await JSZip.loadAsync(await blob.arrayBuffer())
+    const document = new dom.window.DOMParser().parseFromString(await exported.file('word/document.xml').async('string'), 'application/xml')
+    for (const text of texts) {
+      const paragraph = [...document.getElementsByTagName('w:p')].find(p => p.textContent === text)
+      assert.equal(paragraph.getElementsByTagName('w:jc')[0].getAttribute('w:val'), 'center')
+    }
+    assert.deepEqual(normalize(state), state)
+  }
+})
+
 test('normalizing an older Drive snapshot keeps edits, images and structured fields', async () => {
   const { load } = harness()
   const source = await load('src/lib/import-docx.ts').importDocx(await fixture(), 'Drive.docx')

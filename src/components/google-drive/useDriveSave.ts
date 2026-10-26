@@ -7,20 +7,19 @@ import { createDocxBlob } from '@/components/document-editor/exportDocx'
 
 export function driveDraftKey(source: DriveSource) { return `drive-draft:${source.accountId}:${source.id}` }
 
-export function useDriveAutosave(state: DocumentState, source?: DriveSource, initialDirty = false) {
+export function useDriveSave(state: DocumentState, source?: DriveSource, initialDirty = false) {
   const latest = useRef(state)
-  const saved = useRef(initialDirty ? '' : JSON.stringify(state))
+  const [savedState, setSavedState] = useState(initialDirty ? '' : JSON.stringify(state))
+  const saved = useRef(savedState)
   const version = useRef(source?.version || '')
   const [isSaving, setIsSaving] = useState(false)
   const running = useRef<Promise<boolean> | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const blocked = useRef(false)
-  const [status, setStatus] = useState('Sẵn sàng · Tự lưu sau khi chỉnh sửa')
+  const [status, setStatus] = useState('Sẵn sàng · Bấm Lưu để lưu vào Google Drive')
   const [error, setError] = useState('')
   const [warning, setWarning] = useState('')
 
   const flush = useCallback(async (): Promise<boolean> => {
-    clearTimeout(timer.current)
     if (!source) return true
     if (running.current) return running.current
     if (blocked.current) return false
@@ -28,7 +27,7 @@ export function useDriveAutosave(state: DocumentState, source?: DriveSource, ini
       try {
         setIsSaving(true)
         setError('')
-        while (JSON.stringify(latest.current) !== saved.current) {
+        if (JSON.stringify(latest.current) !== saved.current) {
           const snapshot = latest.current
           const serialized = JSON.stringify(snapshot)
           setStatus('Đang lưu lên Google Drive...')
@@ -45,6 +44,7 @@ export function useDriveAutosave(state: DocumentState, source?: DriveSource, ini
           }
           version.current = data.version
           saved.current = serialized
+          setSavedState(serialized)
           try { localStorage.setItem(driveDraftKey(source), JSON.stringify({ version: version.current, state: latest.current })) } catch { /* The remote content has already been saved. */ }
           setWarning(data.warning || '')
           // Only remove this draft if no newer edit was made while the request was running.
@@ -52,7 +52,7 @@ export function useDriveAutosave(state: DocumentState, source?: DriveSource, ini
             try { localStorage.removeItem(driveDraftKey(source)) } catch { /* Drive save still succeeded. */ }
           }
         }
-        setStatus('Đã lưu vào Google Drive ✓')
+        setStatus(JSON.stringify(latest.current) === saved.current ? 'Đã lưu vào Google Drive ✓' : 'Có thay đổi chưa lưu · Bấm Lưu để lưu vào Google Drive')
         return true
       } catch (error) {
         setStatus('Chưa lưu được lên Google Drive')
@@ -71,26 +71,23 @@ export function useDriveAutosave(state: DocumentState, source?: DriveSource, ini
     let draftSaved = false
     try { localStorage.setItem(driveDraftKey(source), JSON.stringify({ version: version.current, state: JSON.parse(serialized) })); draftSaved = true } catch { /* Report the missing recovery copy below. */ }
     const notification = setTimeout(() => {
-      setStatus('Có thay đổi · Đang chờ lưu...')
+      setStatus('Có thay đổi chưa lưu · Bấm Lưu để lưu vào Google Drive')
       try {
-        if (!draftSaved) { setWarning('Không đủ dung lượng lưu bản nháp trên thiết bị. Hãy chờ lưu lên Drive hoặc xuất DOCX trước khi rời trang.'); return }
-        if (!localStorage.getItem(driveDraftKey(source))) setWarning('Trình duyệt không lưu được bản nháp khôi phục. Hãy chờ lưu lên Drive trước khi rời trang.')
-      } catch { setWarning('Không thể lưu bản nháp trên thiết bị. Hãy chờ lưu lên Drive trước khi rời trang.') }
+        if (!draftSaved) { setWarning('Không đủ dung lượng lưu bản nháp trên thiết bị. Hãy bấm Lưu hoặc xuất DOCX trước khi rời trang.'); return }
+        if (!localStorage.getItem(driveDraftKey(source))) setWarning('Trình duyệt không lưu được bản nháp khôi phục. Hãy bấm Lưu trước khi rời trang.')
+      } catch { setWarning('Không thể lưu bản nháp trên thiết bị. Hãy bấm Lưu trước khi rời trang.') }
     }, 0)
-    timer.current = setTimeout(() => { void flush() }, 1500)
-    return () => { clearTimeout(notification); clearTimeout(timer.current) }
-  }, [state, source, flush])
+    return () => clearTimeout(notification)
+  }, [state, source])
 
   useEffect(() => {
     if (!source) return
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
       if (JSON.stringify(latest.current) !== saved.current) { event.preventDefault(); event.returnValue = '' }
     }
-    const onOnline = () => { void flush() }
     window.addEventListener('beforeunload', onBeforeUnload)
-    window.addEventListener('online', onOnline)
-    return () => { window.removeEventListener('beforeunload', onBeforeUnload); window.removeEventListener('online', onOnline) }
-  }, [source, flush])
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [source])
 
-  return { status, error, warning, flush, isSaving }
+  return { status, error, warning, flush, isSaving, isDirty: Boolean(source) && JSON.stringify(state) !== savedState }
 }

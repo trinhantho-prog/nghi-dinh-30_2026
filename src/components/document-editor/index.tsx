@@ -15,7 +15,7 @@ import { saveBrowserDocument, saveBrowserVersion, deleteBrowserVersion } from '@
 import MainContentEditor from './MainContentEditor'
 import { readAIConfig } from '@/lib/ai-config'
 import type { DriveSource } from '@/lib/drive-document'
-import { useDriveAutosave } from '@/components/google-drive/useDriveAutosave'
+import { useDriveSave } from '@/components/google-drive/useDriveSave'
 
 interface DocVersion {
   id: string
@@ -86,7 +86,7 @@ export default function DocumentEditor({
   const currentDocIdRef = useRef<string | undefined>(documentId)
   const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve())
   const editorRef = useRef<HTMLDivElement>(null)
-  const drive = useDriveAutosave(state, driveSource, driveInitialDirty)
+  const drive = useDriveSave(state, driveSource, driveInitialDirty)
 
   const persistDocument = useCallback((snapshot: DocumentState) => {
     const request = saveQueueRef.current.catch(() => {}).then(async () => {
@@ -243,10 +243,10 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
   }
 
   async function handleNewDocument() {
-    if (fileDirty && !window.confirm('Có thay đổi chưa lưu vào máy. Bạn có muốn tạo văn bản mới?')) return
+    if (!confirmLeaveImportedFile()) return
     if (localFileName) { router.push('/documents/new'); return }
     if (driveSource) {
-      if (await drive.flush()) router.push('/documents/new')
+      router.push('/documents/new')
       return
     }
     clearTimeout(saveTimerRef.current)
@@ -261,6 +261,11 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
 
   async function handleExportDocx() {
     await exportDocx(state)
+  }
+
+  function confirmLeaveImportedFile() {
+    if (!fileDirty && !drive.isDirty && !drive.isSaving) return true
+    return window.confirm('Có thay đổi chưa lưu. Rời trình soạn thảo mà không lưu? Bấm Hủy để quay lại và bấm Lưu.')
   }
 
   async function handleSaveAs() {
@@ -293,11 +298,15 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
 
   return (
     <div className="flex h-dvh min-w-0 flex-col overflow-hidden" onClickCapture={async event => {
-      if (driveSource || localFileName || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
       const link = (event.target as HTMLElement).closest('a')
       if (!link || !link.getAttribute('href')?.startsWith('/') || link.target === '_blank') return
       event.preventDefault()
       event.stopPropagation()
+      if (driveSource || localFileName) {
+        if (confirmLeaveImportedFile()) router.push(link.getAttribute('href')!)
+        return
+      }
       clearTimeout(saveTimerRef.current)
       try { await persistDocument(state); router.push(link.getAttribute('href')!) }
       catch { setSaveError('Chưa lưu được văn bản. Vui lòng thử lưu lại trước khi rời trang.') }
@@ -306,13 +315,13 @@ Khi liệt kê các ý kiến, luận điểm, giải pháp, nhiệm vụ hoặc
         <Link href="/dashboard" className="font-semibold text-blue-700">← Văn bản</Link>
         <Link href="/documents/local" className="rounded border border-slate-300 px-3 py-2 font-semibold">Mở file từ máy</Link>
         <button disabled={fileSaving} onClick={() => { void handleSaveAs() }} className="rounded bg-blue-700 px-3 py-2 font-semibold text-white disabled:opacity-50">{fileSaving ? 'Đang lưu file...' : 'File Save As'}</button>
-        {localFileName && <span role="status" className="min-w-0 flex-1 break-words">{localFileName} · {fileDirty ? 'Chưa lưu bản chỉnh sửa vào máy' : 'Đã lưu vào máy'}</span>}
+        {localFileName && <span role="status" className="min-w-0 flex-1 break-words">{localFileName} · {fileDirty ? 'Chưa lưu bản chỉnh sửa vào máy · Bấm File Save As để lưu' : 'Đã lưu vào máy'}</span>}
         <Link href="/profile" className="ml-auto font-semibold text-blue-700">Hồ sơ người dùng</Link>
         {!driveSource && !localFileName && <span role="status">{saveError ? 'Chưa lưu được' : savedState === JSON.stringify(state) ? (storageMode === 'browser' ? 'Đã lưu trên trình duyệt' : 'Đã lưu vào tài khoản') : 'Đang chờ lưu…'}</span>}
         {fileError && <p role="alert" className="w-full text-red-700">{fileError}</p>}
       </div>
       {driveSource && <div className="shrink-0 border-b border-blue-200 bg-blue-50 px-5 py-2 text-xs text-[#1a1f36]">
-        <div className="flex flex-wrap items-center gap-3"><strong className="mr-auto">Google Drive: {driveSource.name}</strong><span role="status">{drive.status}</span><button disabled={drive.isSaving} className="font-semibold text-blue-700 underline disabled:opacity-60" onClick={handleSaveVersion}>{drive.isSaving ? 'Đang lưu...' : 'Lưu ngay / Thử lại'}</button><button className="font-semibold text-blue-700 underline" onClick={async () => { if (await drive.flush()) router.push('/drive') }}>← Về Drive</button></div>
+        <div className="flex flex-wrap items-center gap-3"><strong className="mr-auto">Google Drive: {driveSource.name}</strong><span role="status">{drive.status}</span><button disabled={drive.isSaving} className="font-semibold text-blue-700 underline disabled:opacity-60" onClick={handleSaveVersion}>{drive.isSaving ? 'Đang lưu...' : 'Lưu vào Google Drive'}</button><button className="font-semibold text-blue-700 underline" onClick={() => { if (confirmLeaveImportedFile()) router.push('/drive') }}>← Về Drive</button></div>
         {drive.error && <p role="alert" className="mt-1 text-red-700">{drive.error} <a className="underline" href="/api/drive/connect" target="_blank" rel="noopener noreferrer">Kết nối lại Drive</a> · <button className="underline" onClick={() => window.location.reload()}>Mở lại bản trên Drive</button> · Có thể xuất DOCX để giữ bản đang sửa.</p>}
         {drive.warning && <p role="alert" className="mt-1 text-amber-800">{drive.warning}</p>}
       </div>}

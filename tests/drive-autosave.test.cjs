@@ -21,7 +21,7 @@ async function harness(t, { initialDirty = false, respond = async () => Response
   const calls = []
   const timers = new Map()
   let timerId = 0
-  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/components/google-drive/useDriveAutosave.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
+  const code = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/components/google-drive/useDriveSave.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const compiled = { exports: {} }
   new Function('require', 'module', 'exports', 'fetch', 'setTimeout', 'clearTimeout', code)(name => {
     if (name === 'react') return React
@@ -33,7 +33,7 @@ async function harness(t, { initialDirty = false, respond = async () => Response
   }, (callback, delay) => { timers.set(++timerId, { callback, delay }); return timerId }, id => timers.delete(id))
   let current
   function Probe({ state }) {
-    current = compiled.exports.useDriveAutosave(state, source, initialDirty)
+    current = compiled.exports.useDriveSave(state, source, initialDirty)
     return null
   }
   const root = createRoot(document.getElementById('root'))
@@ -51,10 +51,10 @@ async function harness(t, { initialDirty = false, respond = async () => Response
     calls, render,
     get current() { return current },
     async flush() { let result; await React.act(async () => { result = await current.flush() }); return result },
-    async autosave() {
-      const timer = [...timers.values()].find(item => item.delay === 1500)
-      assert.ok(timer, 'A changed document must schedule autosave')
-      await React.act(async () => { timer.callback(); await current.flush() })
+    async runTimers() {
+      const pending = [...timers.values()]
+      timers.clear()
+      await React.act(async () => { for (const timer of pending) await timer.callback() })
     },
   }
 }
@@ -70,18 +70,33 @@ test('manual save uploads state changes without requiring a captured input or cl
   assert.equal(localStorage.getItem('drive-draft:account-A:file-A'), null)
 })
 
-test('autosave observes document state and does not upload an unchanged opened file', async t => {
+test('opening, editing, waiting and reconnecting never upload without an explicit save', async t => {
   const h = await harness(t)
   assert.equal(await h.flush(), true)
   assert.equal(h.calls.length, 0)
-  await h.render({ mainContent: 'Autosaved change' })
-  await h.autosave()
+  await h.render({ mainContent: 'Unsaved change' })
+  await h.runTimers()
+  await React.act(async () => { window.dispatchEvent(new window.Event('online')) })
+  assert.equal(h.calls.length, 0)
+  assert.equal(h.current.isDirty, true)
+  assert.match(h.current.status, /chưa lưu/)
+  const leaving = new window.Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(leaving)
+  assert.equal(leaving.defaultPrevented, true)
+  assert.equal(await h.flush(), true)
   assert.equal(h.calls.length, 1)
+  assert.equal(h.current.isDirty, false)
+  const savedLeaving = new window.Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(savedLeaving)
+  assert.equal(savedLeaving.defaultPrevented, false)
 })
 
-test('normalized imports are saved even before the first user edit', async t => {
+test('normalized imports and restored drafts wait for the user to save', async t => {
   const h = await harness(t, { initialDirty: true })
-  await h.autosave()
+  await h.runTimers()
+  assert.equal(h.calls.length, 0)
+  assert.equal(h.current.isDirty, true)
+  assert.equal(await h.flush(), true)
   assert.equal(h.calls.length, 1)
 })
 
@@ -99,7 +114,7 @@ test('failed saves keep a recovery draft and can be retried', async t => {
   assert.equal(h.current.error, '')
 })
 
-test('edits made during upload are saved next using the returned version', async t => {
+test('edits made during upload remain unsaved until the next explicit save uses the returned version', async t => {
   let finish
   const h = await harness(t, { respond: async () => h.calls.length === 1 ? new Promise(resolve => { finish = resolve }) : Response.json({ version: '3' }) })
   await h.render({ mainContent: 'First change' })
@@ -108,6 +123,12 @@ test('edits made during upload are saved next using the returned version', async
   assert.equal(h.current.isSaving, true)
   await h.render({ mainContent: 'Change during upload' })
   await React.act(async () => { finish(Response.json({ version: '2' })); assert.equal(await pending, true) })
+  assert.equal(h.calls.length, 1)
+  assert.equal(JSON.parse(h.calls[0].init.body.get('state')).mainContent, 'First change')
+  assert.equal(h.current.isDirty, true)
+  assert.match(h.current.status, /chưa lưu/)
+  assert.equal(JSON.parse(localStorage.getItem('drive-draft:account-A:file-A')).state.mainContent, 'Change during upload')
+  assert.equal(await h.flush(), true)
   assert.equal(h.calls.length, 2)
   assert.equal(h.calls[1].init.body.get('version'), '2')
   assert.equal(JSON.parse(h.calls[1].init.body.get('state')).mainContent, 'Change during upload')

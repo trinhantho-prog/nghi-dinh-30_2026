@@ -5,7 +5,7 @@ import Link from 'next/link'
 import DocumentEditor from '@/components/document-editor'
 import { exportDocx } from '@/components/document-editor/exportDocx'
 import { DriveSource, importedHtmlToDocument, validateDriveDocument } from '@/lib/drive-document'
-import { driveDraftKey } from './useDriveAutosave'
+import { driveDraftKey } from './useDriveSave'
 import { normalizeImportedDocument } from '@/lib/normalize-imported-document'
 import type { Agency, DocumentState, Signer } from '@/types'
 import { importDocx } from '@/lib/import-docx'
@@ -52,11 +52,11 @@ export default function DriveDocument({ fileId, agencies, signers, documentCount
       {error && <div role="alert" className="space-y-3 text-sm text-red-700"><p>{error}</p><a href="/api/drive/connect" className="mr-4 underline">Kết nối lại Drive</a><button onClick={() => setRevision(value => value + 1)} className="underline">Thử lại</button></div>}
       {loaded && <>
         <h1 className="break-words text-lg font-bold">{loaded.source.name}</h1>
-        <p className="text-sm leading-relaxed">Tự động chuẩn hóa các đoạn nội dung theo mẫu Nghị định 30. Đầu văn bản, nơi nhận/chữ ký, các bảng và dòng đơn vị tính giữ định dạng gốc. Khổ trang và lề gốc được giữ để bảo toàn bố cục các phần này. Hãy kiểm tra bản xem trước.</p>
+        <p className="text-sm leading-relaxed">Tự động chuẩn hóa các đoạn nội dung theo mẫu Nghị định 30. Các đoạn căn giữa, đầu văn bản, nơi nhận/chữ ký, các bảng và dòng đơn vị tính giữ định dạng gốc. Khổ trang và lề gốc được giữ để bảo toàn bố cục các phần này. Hãy kiểm tra bản xem trước.</p>
         {!original && <button className="text-sm font-semibold text-blue-700 underline" onClick={() => { setLoaded(null); setDraft(null); setOriginal(true); setRevision(value => value + 1) }}>Đọc lại file trên Drive và chuẩn hóa</button>}
-        <p className="text-sm leading-relaxed text-slate-600">Khi bạn bấm mở trong trình soạn thảo, bản đã chuẩn hóa và các chỉnh sửa tiếp theo sẽ tự lưu vào đúng file gốc trên Drive sau khoảng 1,5 giây. Tên file và thư mục được giữ nguyên. Ảnh trong ô bảng hiện được đặt ngay sau bảng; nhận xét và các thành phần Word nâng cao chưa được bảo toàn. Kiểm tra bản xem trước trước khi chỉnh sửa.</p>
+        <p className="text-sm leading-relaxed text-slate-600">Chỉ khi bạn bấm “Lưu vào Google Drive”, bản đã chuẩn hóa và các chỉnh sửa mới được ghi vào file gốc. Tên file và thư mục được giữ nguyên. Bản nháp khôi phục được giữ trên thiết bị. Ảnh trong ô bảng hiện được đặt ngay sau bảng; nhận xét và các thành phần Word nâng cao chưa được bảo toàn. Kiểm tra bản xem trước trước khi lưu.</p>
         {draft && <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
-          <p>Có bản nháp trên thiết bị. {draft.version === loaded.source.version ? 'Bạn có thể khôi phục và tiếp tục tự lưu.' : 'File trên Drive đã có phiên bản mới. Có thể tải bản nháp để đối chiếu trước khi sửa bản mới.'}</p>
+          <p>Có bản nháp trên thiết bị. {draft.version === loaded.source.version ? 'Bạn có thể khôi phục, tiếp tục chỉnh sửa và bấm Lưu khi hoàn tất.' : 'File trên Drive đã có phiên bản mới. Có thể tải bản nháp để đối chiếu trước khi sửa bản mới.'}</p>
           <button className="mr-4 font-semibold text-blue-700 underline" onClick={() => { void exportDocx(draft.state) }}>Tải bản nháp DOCX</button>
           {draft.version === loaded.source.version && <button className="font-semibold text-blue-700 underline" onClick={() => { setLoaded({ ...loaded, state: draft.state }); setRestored(true); setEditing(true) }}>Khôi phục và tiếp tục chỉnh sửa</button>}
         </div>}

@@ -96,13 +96,13 @@ export default function DriveBrowser({ initialError }: { initialError?: string }
   return (
     <div className="min-h-screen bg-[#f4f5f8] text-[#1a1f36]">
       <header className="flex flex-wrap items-center justify-between gap-3 bg-[#1a56b0] px-6 py-4 text-white">
-        <div><h1 className="font-bold">Google Drive cá nhân</h1><p className="text-xs opacity-80">Nguồn tài liệu và tự động lưu file gốc</p></div>
+        <div><h1 className="font-bold">Google Drive cá nhân</h1><p className="text-xs opacity-80">Nguồn tài liệu và lưu file gốc khi bấm Lưu</p></div>
         <div className="flex gap-3 text-sm"><Link href="/dashboard">← Danh sách văn bản</Link><Link href="/settings">Cài đặt ban đầu</Link></div>
       </header>
       <main className="mx-auto max-w-7xl space-y-4 p-6">
         {!session && <p role="status">Đang kiểm tra kết nối Drive...</p>}
         {session && !session.configured && <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm"><h2 className="font-bold">Chưa cấu hình kết nối Google Drive</h2><p className="mt-2">Cần thiết lập Google OAuth Client ID, Client Secret và khóa mã hóa phiên trên máy chủ. Sau khi cấu hình, kết nối tài khoản Google cá nhân tại đây.</p></div>}
-        {session?.configured && !session.connected && <div className="rounded-xl border border-[#dde1ef] bg-white p-5"><p className="mb-3 text-sm">Kết nối tài khoản để xem tất cả thư mục, kể cả thư mục trống. File Google Docs và Word (.docx) được mở trong trình soạn thảo hành chính và tự lưu về đúng file trên Drive.</p><a href="/api/drive/connect" className={button}>Kết nối tài khoản Google Drive</a></div>}
+        {session?.configured && !session.connected && <div className="rounded-xl border border-[#dde1ef] bg-white p-5"><p className="mb-3 text-sm">Kết nối tài khoản để xem tất cả thư mục, kể cả thư mục trống. File Google Docs và Word (.docx) được mở trong trình soạn thảo hành chính và chỉ lưu về đúng file trên Drive khi bạn bấm Lưu.</p><a href="/api/drive/connect" className={button}>Kết nối tài khoản Google Drive</a></div>}
         {session?.connected && <>
           <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white p-4 text-sm"><span className="mr-auto">Đã kết nối: <strong>{session.email}</strong></span><button className={button} onClick={() => setRevision(value => value + 1)}>Tải lại</button><a href="/api/drive/connect" className={button}>Đổi tài khoản</a><button className={button} onClick={disconnect}>Ngắt kết nối</button></div>
           <div className="grid gap-4 md:grid-cols-[300px_1fr]">
@@ -118,7 +118,7 @@ export default function DriveBrowser({ initialError }: { initialError?: string }
             <section className="min-w-0 rounded-xl border border-[#dde1ef] bg-white p-4">
               <h2 className="mb-3 break-words font-bold">Drive của tôi{folder !== 'root' ? ` / ${folders.find(item => item.id === folder) ? folderPath(folders.find(item => item.id === folder)!) : 'Thư mục'}` : ''}</h2>
               <input aria-label="Tìm file trong thư mục" placeholder="Tìm file trong thư mục hiện tại..." value={search} onChange={e => setSearch(e.target.value)} className="mb-4 w-full rounded border border-[#dde1ef] p-2 text-sm" />
-              <p className="mb-3 text-xs text-slate-500">File được nhập theo mẫu hành chính của ứng dụng. Sau khi bạn chỉnh sửa, nội dung mới sẽ tự lưu vào file gốc; tên file và thư mục được giữ nguyên.</p>
+              <p className="mb-3 text-xs text-slate-500">File được nhập theo mẫu hành chính của ứng dụng. Sau khi chỉnh sửa, bấm Lưu để ghi nội dung mới vào file gốc; tên file và thư mục được giữ nguyên.</p>
               {loading ? <p role="status">Đang tải file...</p> : <ul className="divide-y divide-slate-100">
                 {entries.filter(entry => entry.name.toLocaleLowerCase('vi').includes(search.toLocaleLowerCase('vi'))).map(entry => <li key={entry.id} className="flex flex-wrap items-center gap-3 py-3">
                   <span className="min-w-0 flex-1 break-words text-sm">{entry.mimeType === FOLDER ? '📁' : '📄'} {entry.name}</span>

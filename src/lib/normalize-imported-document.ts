@@ -15,6 +15,8 @@ function withoutPageNumbers(blocks: MainContentBlock[] = []): MainContentBlock[]
 }
 
 function normalizeParagraph(block: MainContentParagraphBlock, fontSize: number): MainContentParagraphBlock {
+  // Keep the source geometry and typography of centered paragraphs.
+  if (block.style?.align === 'center') return block
   // Unit captions belong to the table layout, including their right alignment.
   if (/^\s*(?:Đơn vị(?:\s+(?:tính|tiền))?|ĐVT)\s*:/iu.test(block.text)) return block
   const style: SourceTextStyle = {

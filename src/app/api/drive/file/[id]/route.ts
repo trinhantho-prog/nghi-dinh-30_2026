@@ -32,7 +32,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const session = await driveSession()
     const id = validDriveId((await context.params).id)
     const { file, etag } = await metadata(session, id)
-    if (!file.capabilities?.canEdit) throw new DriveError('File này chỉ có quyền xem. Cần quyền chỉnh sửa để tự lưu vào file gốc.', 403)
+    if (!file.capabilities?.canEdit) throw new DriveError('File này chỉ có quyền xem. Cần quyền chỉnh sửa để lưu vào file gốc.', 403)
     const source = { id, name: file.name, mimeType: file.mimeType, version: file.version, accountId: session.accountId, etag }
     try {
       const savedId = await snapshotFile(session, id)
